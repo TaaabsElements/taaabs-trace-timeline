@@ -465,7 +465,7 @@
         // We remove the previous obsels drew
         for (var i = 0; i < this._obselsDisplayed.length; i++) {
           for (var j = 0; j < this._obselsDisplayed[i].length; j++) {
-            this.$.pixijs.removeChildFromStage(this._obselsDisplayed[i][j]);
+            this.$.pixijs.removeChildFromStage(this._obselsDisplayed[i][j].c);
           }
         }
 
