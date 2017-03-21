@@ -352,7 +352,7 @@
             var j = 0;
             while (isInRange && rules[i].attributes && j < rules[i].attributes.length) {
               // If the obsel actually possess the attribute of the rule, we check for the operators of the rule
-              if (obsel[rules[i].attributes[j].name]) {
+              if (obsel[rules[i].attributes[j].name] !== null || obsel[rules[i].attributes[j].name] !== undefined) {
                 if (rules[i].attributes[j].operator) {
                   var attrVal = Number(obsel[rules[i].attributes[j].name]);
                   var styleVal = Number(rules[i].attributes[j].val);
@@ -449,7 +449,6 @@
        * @method displayObsels
        */
       displayObsels: function(start, end, obsels) {
-
         var that = this;
 
         this._begin = start;
