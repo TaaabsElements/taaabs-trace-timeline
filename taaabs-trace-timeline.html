@@ -1,12 +1,13 @@
-<link rel="import" href="../iron-resizable-behavior/iron-resizable-behavior.html">
+<link rel="import" href="../../bower_components/iron-resizable-behavior/iron-resizable-behavior.html">
 <link rel="import" href="../pixi-js-component/pixi-js-component.html">
+<link rel="import" href="../taaabs-time-utilities/taaabs-time-utilities.html">
 <dom-module id="taaabs-trace-timeline">
   <style>
-    :host {
+     :host {
       display: block;
     }
 
-    :host #pixijs {
+     :host #pixijs {
       width: 100%;
     }
   </style>
@@ -65,6 +66,11 @@
           type: Number,
           notify: true,
           value: 0
+        },
+
+        _obselWidth: {
+          type: Number,
+          value: 14
         },
 
         /**
@@ -155,6 +161,14 @@
           type: Array,
           notify: true,
           value: []
+        },
+
+        _ttu: {
+          type: Object,
+          notify: true,
+          value: function(){
+            return new TaaabsTimeUtilities();
+          }
         }
       },
 
@@ -168,6 +182,7 @@
        * @method _onPixiJsResize
        */
       _onPixiJsResize: function() {
+        console.log('resize?');
         this.async(function(evt) {
           this.set('_width', this.$.pixijs.clientWidth);
           this.updateVisu();
@@ -189,7 +204,7 @@
        * @method _getHeight
        */
       _getHeight: function() {
-        return 215;
+        return 315;
       },
 
       /**
@@ -200,19 +215,733 @@
       initVisu: function() {
         this.$.pixijs.set('height', this._getHeight());
         this.$.pixijs.init({
-          antialias: true
+          antialias: true,
+          backgroundColor: 0xFAFAFA
         });
         // Listen to pixi resize.
         this.listen(this.$.pixijs, 'iron-resize', '_onPixiJsResize');
         this.set('_width', this.$.pixijs.clientWidth);
 
-        this._initZoomArea();
-        this._initZoomFocusArea();
+        this._initKeyboard();
 
-        for (var i = 0; i < Math.floor(this._getWidth() / 10); i++) {
-          this.push('grad', this.$.pixijs.createRectangleFill(-1, 0, 2, this._getHeight(), 0xDADFE1));
-          this.grad[i].z = 0;
-          this.$.pixijs.addToStage(this.grad[i]);
+        // this._initZoomArea();
+        // this._initZoomFocusArea();
+
+        // Manage graduation
+        // for (var i = 0; i < Math.floor(this._getWidth() / 10); i++) {
+        //   this.push('grad', this.$.pixijs.createRectangleFill(-1, 0, 2, this._getHeight(), 0xDADFE1));
+        //   this.grad[i].z = 0;
+        //   this.$.pixijs.addToStage(this.grad[i]);
+        // }
+      },
+
+
+      // MARK: f: _setTemporalBounds
+      _setTemporalBounds: function(begin, end){
+        this.set('begin', begin);
+        this.set('end', end);
+
+        this.$.pixijs.clearStage();
+
+
+        this._initBackgroundContainer();
+
+        this._initObselsContainer();
+
+        this._initSelectContainer();
+
+      },
+
+      // MARK: f: _initSelectContainer
+      _initSelectContainer: function(){
+        if(this._selectContainer){
+          this.$.pixijs.removeChildFromStage(this._selectContainer);
+        }
+
+        this.set('_selectContainer', new PIXI.Container());
+        this._selectContainer.x = 0;
+        this._selectContainer.y = 0;
+        this._selectContainer.width = this._width;
+        this._selectContainer.height = 315;
+
+        var contCount = this._width / (this._obselWidth + 2);
+        var duration = this.end - this.begin;
+        var period = Math.ceil(duration / contCount);
+        this.set('_selectContainers', []);
+
+        for (var i = 0; i < contCount; i++) {
+          var b = this.begin + (period * i);
+          var e = b + period;
+          var container = this._createContainer(i);
+          container = this._setSelectContainerBehavior(container);
+          this.push('_selectContainers', {
+            "c": container,
+            "b": b,
+            "e": e
+          });
+          this._selectContainer.addChild(container);
+        }
+
+        this.$.pixijs.addToStage(this._selectContainer);
+      },
+
+      // MARK: f: _setSelectContainerBehavior
+      _setSelectContainerBehavior: function(container){
+
+        container.interactive = true;
+        container.hitArea = new PIXI.Rectangle(0, 0, this._obselWidth + 2, 315);
+
+        // On mouse over :
+        // I.   _lastHoverSelectIndex <- the tile index & _lastHoverTime -> Date.now()
+        //
+        // II.  If _isBeingSelected, set in onMouseDown & onMouseUp & onMouseUpOutside
+        //   .1.  We fill all the selecting tile with blue, selected tile with light-blue & reste with black.
+        //
+        // III. If we're not selecting any tile, and if the tile is not selected, with hightlight it.
+        container.on('mouseover', function(component, evt) {
+          // I.
+          component.set('_lastHoverSelectIndex', this._intervalIndex);
+          component.set('_lastHoverTime'     , Date.now());
+          // II.
+          if(component._isBeingSelected){
+            var s = component._startSelectSelectedIndex;
+            var e = this._intervalIndex;
+            // If the user selected from right to left, we invert indexes.
+            if(s > e){
+              s = e;
+              e = component._startSelectSelectedIndex;
+            }
+            // For each tile, we fill witht he right color
+            var l = component._selectContainers;
+            for(var i = 0; i < l.length; i++){
+              if     ( i >= s && i <= e) { component._fillSelectedContainer(l[i].c); }
+              else                       { l[i].c.removeChildren();   }
+            }
+          }
+        }.bind(container, this));
+
+        // On mouse out :
+        // I.   _lastLeaveSelectIndex <- the tile index & _lastLeaveTime -> Date.now()
+        container.on('mouseout', function(component, evt) {
+          // I.
+          component.set('_lastLeaveSelectIndex', this._intervalIndex);
+          component.set('_lastLeaveTime', Date.now());
+        }.bind(container, this));
+
+        // On mouse down :
+        // I. _isBeingSelected <- true; _startSelectSelectedIndex <- the tile index;
+        container.on('mousedown', function(component, evt) {
+          // I.
+          component.set('_isBeingSelected', true);
+          component.set('_startSelectSelectedIndex', this._intervalIndex);
+          component._fillSelectedContainer(this);
+        }.bind(container, this));
+
+        // On mouse up
+        // I. If we are currently selecting some tiles & the tile is the same as the start tile
+        // I.1. _isBeingSelected <- false; _startSelectSelectedIndex & _endSelectSelectedIndex <- the tile index
+        // I.2. Set the tile to _selected, and all the others to not selected. Fill with right color.
+        // I.3. Calls _intervalSelectSelected;
+        container.on('mouseup', function(component, evt) {
+          // I.
+          if(component._isBeingSelected && this._intervalIndex === component._startSelectSelectedIndex){
+            // I.1.
+            component.set('_isBeingSelected'       , false);
+            component.set('_startSelectSelectedIndex', this._intervalIndex);
+            component.set('_endSelectselectedIndex'  , this._intervalIndex);
+            // I.2.
+            var s = this._intervalIndex;
+            var e = s;
+            var l = component._selectContainers;
+            for(var i = 0; i < l.length; i++){
+              if(i !== e){
+                l[i].c.removeChildren();
+              }
+              else{
+                component._fillSelectedContainer(l[i].c);
+              }
+            }
+            // I.3.
+            component._intervalSelectSelected([component._selectContainers[this._intervalIndex]]);
+          }
+        }.bind(container, this));
+
+        // On mouse up outside
+        // I. If we're currently selecting and the tile is not the same as the start tile.
+        // I.1. _isBeingSelected <- false
+        // I.2. If we didn't leave outside the tiles
+        // I.2.1. We reorder the start and end (if user goes from right to left)
+        // I.2.2. For each tile, we set as selected those who are between the first and last tile selected. We also fill with right color.
+        // I.2.3. We call _intervalSelectSelected;
+        // I.3 IF we leave outside the tiles, we reset the tiles with previous selected colors.
+        container.on('mouseupoutside', function(component, evt) {
+          // I.
+          if(component._isBeingSelected && this._intervalIndex === component._startSelectSelectedIndex){
+            // I.1.
+            component.set('_isBeingSelected', false);
+            var l = component._selectContainers;
+            var i = 0;
+            // I.2.
+            if( component._lastHoverSelectIndex !== component._lastLeaveSelectIndex || component._lastHoverTime > component._lastLeaveTime  ){
+              // I.2.1.
+              if(component._lastHoverSelectIndex < component._startSelectSelectedIndex){
+                component.set('_endSelectSelectedIndex', component.get('_startSelectSelectedIndex'));
+                component.set('_startSelectSelectedIndex', component._lastHoverSelectIndex);
+              }
+              else{component.set('_endSelectSelectedIndex', component._lastHoverSelectIndex);}
+              // I.2.2.
+              var s = component._startSelectSelectedIndex;
+              var e = component._endSelectSelectedIndex;
+              var is = [];
+              for(i = 0; i < l.length; i++){
+                if( i >= s && i <= e){
+                  component._fillSelectedContainer(l[i].c);
+                  is.push(l[i]);
+                }
+                else{
+                  l[i].c.removeChildren();
+                }
+              }
+              // I.2.3.
+              component._intervalSelectSelected(is);
+            }
+            // I.3.
+            else{
+              for(i = 0; i < l.length; i++){
+                l[i].c.removeChildren();
+              }
+            }
+          }
+        }.bind(container, this));
+
+        return container;
+      },
+
+      // MARK: f: _intervalSelectSelected
+      _intervalSelectSelected: function(list){
+
+      },
+
+      _fillSelectedContainer: function(container){
+        if(container.children.length === 0){
+          var g = new PIXI.Graphics();
+          g.beginFill(0x039BE5);
+          g.drawRect(0, 0, this._obselWidth + 2, 315);
+          g.alpha = 0.37;
+          g.endFill();
+          g.x = 0;
+          g.y = 0;
+          container.addChild(g);
+        }
+      },
+
+      // MARK: f: _initBackgroundContainer
+      _initBackgroundContainer: function(){
+
+        if(this._backgroundContainer){
+          this.$.pixijs.removeChildFromStage(this._backgroundContainer);
+        }
+
+        this.set('_backgroundContainer', new PIXI.Container());
+        this._backgroundContainer.x = 0;
+        this._backgroundContainer.y = 0;
+        this._backgroundContainer.width = this._width;
+        this._backgroundContainer.height = 315;
+
+
+        var contCount = this._width / (this._obselWidth + 2);
+        var duration = this.end - this.begin;
+        var period = Math.ceil(duration / contCount);
+        this.set('_backgroundContainers', []);
+
+        for (var i = 0; i < contCount; i++) {
+          var b = this.begin + (period * i);
+          var e = b + period;
+          var container = this._createContainer(i);
+          this.push('_backgroundContainers', {
+            "c": container,
+            "b": b,
+            "e": e
+          });
+          this._backgroundContainer.addChild(container);
+        }
+
+        this.$.pixijs.addToStage(this._backgroundContainer);
+
+        this._fillBackgroundContainers();
+      },
+
+      // MARK: f: _fillBackgroundContainers
+      _fillBackgroundContainers: function(){
+        // Retrieve the fitest period.
+        var p = this._ttu.get_fittest_period(this.begin, this.end, 20);
+        console.log(p);
+        var colors = [0xECEFF1, 0xFAFAFA];
+        var color = 1;
+        // We set the variables
+        var b = this.begin;
+        var e = this.end;
+        var d = new Date(b);
+        d = this._ttu.get_date_according_to_period(p, d);
+        // We reset the _ttu repeater
+        this._ttu.set('beginDate', d);
+        this._ttu.set('interval', p);
+        this._ttu.resetIntervalRepeater();
+        // Result will define the bounds of every interval we create.
+        var result = {
+          'begin': d,
+          'end': d
+        };
+        var intervals = [];
+        var cIndex = 0;
+        // We create the intervals in a loop until we reach the end of the trace.
+        while (result.end.valueOf() < e) {
+          result = this._ttu.getNextIntervalUTC(null);
+          color = (color === 1) ? 0 : 1;
+
+          console.log( this._backgroundContainers[cIndex].b +" "+ result.begin.valueOf());
+          console.log( this._backgroundContainers[cIndex].e +" "+ result.end.valueOf());
+          while(cIndex < this._backgroundContainers.length && this._backgroundContainers[cIndex].b >= result.begin.valueOf() && this._backgroundContainers[cIndex].e <= result.end.valueOf()){
+
+            var o = new PIXI.Graphics();
+            o.beginFill(colors[color]);
+            o.drawRect(0, 0, this._obselWidth + 2, 415);
+            o.endFill();
+            o.y = 0;
+            o.x = 0;
+
+            this._backgroundContainers[cIndex].c.addChild(o);
+            cIndex++;
+          }
+          if(cIndex < this._backgroundContainers.length && this._backgroundContainers[cIndex].e > result.end.valueOf()){
+
+            var b1 = this._backgroundContainers[cIndex].b;
+            var e1 = this._backgroundContainers[cIndex].e;
+            var b2 = result.begin;
+            var e2 = result.end;
+            var h = (e1 - e2)/(e1 - b1) * 315;
+
+            var pcolor = (color === 0) ? 1 : 0;
+            var o = new PIXI.Graphics();
+            o.beginFill(colors[pcolor]);
+            o.drawRect(0, 0, this._obselWidth + 2, h);
+            o.endFill();
+            o.y = 0;
+            o.x = 0;
+
+            this._backgroundContainers[cIndex].c.addChild(o);
+
+            o = new PIXI.Graphics();
+            o.beginFill(colors[color]);
+            o.drawRect(0, 0, this._obselWidth + 2, 315 - h);
+            o.endFill();
+            o.y = h;
+            o.x = 0;
+
+            this._backgroundContainers[cIndex].c.addChild(o);
+
+            cIndex++;
+          }
+
+        }
+      },
+
+      // MARK: f: _keyboard
+      _keyboard: function(keyCode) {
+        var key = {};
+        key.code = keyCode;
+        key.isDown = false;
+        key.isUp = true;
+        key.press = undefined;
+        key.release = undefined;
+        //The `downHandler`
+        key.downHandler = function(event) {
+          if (event.keyCode === key.code) {
+            if (key.isUp && key.press) key.press();
+            key.isDown = true;
+            key.isUp = false;
+            event.preventDefault();
+          }
+        };
+
+        //The `upHandler`
+        key.upHandler = function(event) {
+          if (event.keyCode === key.code) {
+            if (key.isDown && key.release) key.release();
+            key.isDown = false;
+            key.isUp = true;
+            event.preventDefault();
+          }
+        };
+
+        //Attach event listeners
+        window.addEventListener(
+          "keydown", key.downHandler.bind(key), false
+        );
+        window.addEventListener(
+          "keyup", key.upHandler.bind(key), false
+        );
+        return key;
+      },
+
+
+      // MARK: f: _initKeyboard
+      _initKeyboard: function() {
+        var left = this._keyboard(37),
+          up = this._keyboard(38),
+          right = this._keyboard(39),
+          down = this._keyboard(40);
+
+        up.press = function() {
+          if(this._selectedObsel){
+            var oIndex = this._selectedObsel._oIndex;
+            var cIndex = this._selectedObsel._cIndex;
+            if(oIndex + 1 < this._obselsContainers[cIndex].c.children.length){
+              var no = this._obselsContainers[cIndex].c.getChildAt(oIndex + 1);
+              this._highlightObsel(no);
+              this._resetObsel(this._selectedObsel);
+              no._selected = true;
+              this._selectedObsel._selected = false;
+              this.set('_selectedObsel' , no);
+              this.set('_lastObselIndex', oIndex + 1);
+            }
+            else{
+              cIndex++;
+              while(cIndex < this._obselsContainers.length && this._obselsContainers[cIndex].c.children.length === 0){
+                cIndex++;
+              }
+              if(cIndex < this._obselsContainers.length){
+                var no = this._obselsContainers[cIndex].c.getChildAt(0);
+                this._highlightObsel(no);
+                this._resetObsel(this._selectedObsel);
+                no._selected = true;
+                this._selectedObsel._selected = false;
+                this.set('_selectedObsel' , no);
+                this.set('_lastObselIndex', 0);
+              }
+            }
+          }
+        }.bind(this);
+
+        down.press = function() {
+          if(this._selectedObsel){
+            var oIndex = this._selectedObsel._oIndex;
+            var cIndex = this._selectedObsel._cIndex;
+            if(oIndex - 1 >= 0){
+              var no = this._obselsContainers[cIndex].c.getChildAt(oIndex - 1);
+              this._highlightObsel(no);
+              this._resetObsel(this._selectedObsel);
+              no._selected = true;
+              this._selectedObsel._selected = false;
+              this.set('_selectedObsel', no);
+              this.set('_lastObselIndex', oIndex - 1);
+            }
+            else{
+              cIndex--;
+              while(cIndex >= 0 && this._obselsContainers[cIndex].c.children.length === 0){
+                cIndex--;
+              }
+              if(cIndex >= 0){
+                var no = this._obselsContainers[cIndex].c.getChildAt(this._obselsContainers[cIndex].c.children.length - 1);
+                this._highlightObsel(no);
+                this._resetObsel(this._selectedObsel);
+                no._selected = true;
+                this._selectedObsel._selected = false;
+                this.set('_selectedObsel', no);
+                this.set('_lastObselIndex', this._obselsContainers[cIndex].c.children.length - 1);
+              }
+            }
+          }
+        }.bind(this);
+
+        right.press = function() {
+          if(this._selectedObsel){
+            var oIndex = this._selectedObsel._oIndex;
+            var cIndex = this._selectedObsel._cIndex;
+            cIndex++;
+            while(cIndex < this._obselsContainers.length && this._obselsContainers[cIndex].c.children.length === 0){
+              cIndex++;
+            }
+            if(cIndex < this._obselsContainers.length){
+              var no;
+              if( this._lastObselIndex < this._obselsContainers[cIndex].c.children.length){
+                no = this._obselsContainers[cIndex].c.getChildAt(this._lastObselIndex);
+              }
+              else{
+                no = this._obselsContainers[cIndex].c.getChildAt(this._obselsContainers[cIndex].c.children.length - 1);
+              }
+              this._highlightObsel(no);
+              this._resetObsel(this._selectedObsel);
+              no._selected = true;
+              this._selectedObsel._selected = false;
+              this.set('_selectedObsel', no);
+            }
+          }
+        }.bind(this);
+
+        left.press = function() {
+          if(this._selectedObsel){
+            var oIndex = this._selectedObsel._oIndex;
+            var cIndex = this._selectedObsel._cIndex;
+            cIndex--;
+            while(cIndex >= 0 && this._obselsContainers[cIndex].c.children.length === 0){
+              cIndex--;
+            }
+            if(cIndex >= 0){
+              var no;
+              if( this._lastObselIndex < this._obselsContainers[cIndex].c.children.length){
+                no = this._obselsContainers[cIndex].c.getChildAt(this._lastObselIndex);
+              }
+              else{
+                no = this._obselsContainers[cIndex].c.getChildAt(this._obselsContainers[cIndex].c.children.length - 1);
+              }
+              this._highlightObsel(no);
+              this._resetObsel(this._selectedObsel);
+              no._selected = true;
+              this._selectedObsel._selected = false;
+              this.set('_selectedObsel', no);
+            }
+          }
+        }.bind(this);
+
+      },
+
+      // MARK: f: _initObselsContainer
+      _initObselsContainer: function() {
+
+        // TODO clean before.
+        if(this._obselsContainer){
+          this.$.pixijs.removeChildFromStage(this._obselsContainer);
+        }
+
+        this.set('_obselsContainer', new PIXI.Container());
+        this._obselsContainer.x = 0;
+        this._obselsContainer.y = 0;
+        this._obselsContainer.width = this._width;
+        this._obselsContainer.height = 315;
+
+        var contCount = this._width / (this._obselWidth + 2);
+        var duration = this.end - this.begin;
+        var period = Math.ceil(duration / contCount);
+        this.set('_obselsContainers', []);
+        for (var i = 0; i < contCount; i++) {
+          var b = this.begin + (period * i);
+          var e = b + period;
+          var container = this._createContainer(i);
+          this.push('_obselsContainers', {
+            "c": container,
+            "b": b,
+            "e": e
+          });
+          this._obselsContainer.addChild(container);
+        }
+        this.$.pixijs.addToStage(this._obselsContainer);
+        console.log(this._obselsContainers);
+      },
+
+      // MARK: f: _createContainer
+      _createContainer: function(index) {
+        var container = new PIXI.Container();
+        container.x = (this._obselWidth + 2) * index;
+        container.y = 0;
+        container.width = (this._obselWidth + 2);
+        container.height = 215;
+        container._intervalIndex = index;
+        return container;
+      },
+
+
+      addObsels: function(list) {
+        var cIndex = 0;
+        var oIndex = 0;
+
+        for (cIndex = 0; cIndex < this._obselsContainers.length; cIndex++) {
+          while (oIndex < list.length && this._obselsContainers[cIndex].b <= list[oIndex].begin && this._obselsContainers[cIndex].e > list[oIndex].end) {
+            if (this._obselsContainers[cIndex].c.children.length < 20){
+              this._obselsContainers[cIndex].c.addChild(this._createObsel(cIndex));
+            }
+            oIndex++;
+          }
+        }
+      },
+
+      _createObsel: function(cIndex) {
+        var o = new PIXI.Graphics();
+        var y = (20 * (this._obselWidth + 1)) - ((this._obselWidth + 1) * this._obselsContainers[cIndex].c.children.length);
+        o.beginFill(0xFF0000);
+        o.drawRect(0, 0, this._obselWidth, this._obselWidth);
+        o.endFill();
+        o.y = y;
+        o.x = 1;
+        o.originalColor = 0xFF0000;
+        // Set interactivity
+        o.interactive = true;
+        o.buttonMode = true;
+        o._cIndex = cIndex;
+        o._oIndex = this._obselsContainers[cIndex].c.children.length;
+
+        o.on('mouseover', function(component, evt) {
+          component._highlightObsel(this);
+        }.bind(o, this));
+
+        o.on('mouseout', function(component, evt) {
+          if (!this._selected) {
+            component._resetObsel(this);
+          }
+        }.bind(o, this));
+
+        o.on('mouseup', function(component, evt) {
+          this._selected = true;
+          component._highlightObsel(this);
+          component.set('_selectedObsel', this);
+        }.bind(o, this));
+
+        // .on('mouseout', function(component, evt) {
+        //   obs.scale(-1);
+        //   this.$.pixijs.removeChildFromStage(obs.c);
+        //   this.$.pixijs.addToStage(obs.c);
+        //   obs.setStroke(0, 0x000000);
+        //   //if (!this._clickOnObsel && !evt.target.clicked) this._deEmphasizeObsel(evt.target);
+        // }.bind(null, this))
+        // .on('mousedown', function(component, evt) {
+        //   that._clickOnObsel = true;
+        // }.bind(null, this))
+        // .on('mouseup', function(component, evt) {
+        //   that._clickOnObsel = false;
+        //   that.fire('obselClicked', {
+        //     "obs": evt.target.obsel
+        //   });
+        // }.bind(null, this))
+        // .on('mouseupoutside', function(component, evt) {
+        //   that._clickOnObsel = false;
+        // }.bind(null, this));
+        return o;
+      },
+
+      _highlightObsel: function(o) {
+        o.clear();
+        o.beginFill(o.originalColor);
+        o.lineStyle(4, this._getComplementaryColor(o.originalColor), 1);
+        o.drawRect(0, 0, this._obselWidth, this._obselWidth);
+        o.endFill();
+      },
+
+      _resetObsel: function(o) {
+        o.clear();
+        o.beginFill(o.originalColor);
+        o.drawRect(0, 0, this._obselWidth, this._obselWidth);
+        o.endFill();
+      },
+
+      _getComplementaryColor: function(hex) {
+        temprgb = hexToRgb(hex);
+        temphsv = RGB2HSV(temprgb);
+        temphsv.hue = HueShift(temphsv.hue, 180.0);
+        temprgb = HSV2RGB(temphsv);
+        return rgbToHex(temprgb);
+
+        function componentToHex(c) {
+          var hex = c.toString(16);
+          return hex.length == 1 ? "0" + hex : hex;
+        }
+
+        function rgbToHex(rgb) {
+          return parseInt(componentToHex(rgb.r) + componentToHex(rgb.g) + componentToHex(rgb.b), 16);
+        }
+
+        function hexToRgb(hex) {
+          var shex = hex.toString(16);
+          return {
+            "r": parseInt(shex.substr(0, 2), 16),
+            "g": parseInt(shex.substr(2, 2), 16),
+            "b": parseInt(shex.substr(4, 2), 16),
+          };
+        }
+
+        function RGB2HSV(rgb) {
+          hsv = new Object();
+          max = max3(rgb.r, rgb.g, rgb.b);
+          dif = max - min3(rgb.r, rgb.g, rgb.b);
+          hsv.saturation = (max == 0.0) ? 0 : (100 * dif / max);
+          if (hsv.saturation == 0) hsv.hue = 0;
+          else if (rgb.r == max) hsv.hue = 60.0 * (rgb.g - rgb.b) / dif;
+          else if (rgb.g == max) hsv.hue = 120.0 + 60.0 * (rgb.b - rgb.r) / dif;
+          else if (rgb.b == max) hsv.hue = 240.0 + 60.0 * (rgb.r - rgb.g) / dif;
+          if (hsv.hue < 0.0) hsv.hue += 360.0;
+          hsv.value = Math.round(max * 100 / 255);
+          hsv.hue = Math.round(hsv.hue);
+          hsv.saturation = Math.round(hsv.saturation);
+          return hsv;
+        }
+
+        // RGB2HSV and HSV2RGB are based on Color Match Remix [http://color.twysted.net/]
+        // which is based on or copied from ColorMatch 5K [http://colormatch.dk/]
+        function HSV2RGB(hsv) {
+          var rgb = new Object();
+          if (hsv.saturation == 0) {
+            rgb.r = rgb.g = rgb.b = Math.round(hsv.value * 2.55);
+          } else {
+            hsv.hue /= 60;
+            hsv.saturation /= 100;
+            hsv.value /= 100;
+            i = Math.floor(hsv.hue);
+            f = hsv.hue - i;
+            p = hsv.value * (1 - hsv.saturation);
+            q = hsv.value * (1 - hsv.saturation * f);
+            t = hsv.value * (1 - hsv.saturation * (1 - f));
+            switch (i) {
+              case 0:
+                rgb.r = hsv.value;
+                rgb.g = t;
+                rgb.b = p;
+                break;
+              case 1:
+                rgb.r = q;
+                rgb.g = hsv.value;
+                rgb.b = p;
+                break;
+              case 2:
+                rgb.r = p;
+                rgb.g = hsv.value;
+                rgb.b = t;
+                break;
+              case 3:
+                rgb.r = p;
+                rgb.g = q;
+                rgb.b = hsv.value;
+                break;
+              case 4:
+                rgb.r = t;
+                rgb.g = p;
+                rgb.b = hsv.value;
+                break;
+              default:
+                rgb.r = hsv.value;
+                rgb.g = p;
+                rgb.b = q;
+            }
+            rgb.r = Math.round(rgb.r * 255);
+            rgb.g = Math.round(rgb.g * 255);
+            rgb.b = Math.round(rgb.b * 255);
+          }
+          return rgb;
+        }
+
+        //Adding HueShift via Jacob (see comments)
+        function HueShift(h, s) {
+          h += s;
+          while (h >= 360.0) h -= 360.0;
+          while (h < 0.0) h += 360.0;
+          return h;
+        }
+
+        //min max via Hairgami_Master (see comments)
+        function min3(a, b, c) {
+          return (a < b) ? ((a < c) ? a : c) : ((b < c) ? b : c);
+        }
+
+        function max3(a, b, c) {
+          return (a > b) ? ((a > c) ? a : c) : ((b > c) ? b : c);
         }
       },
 
@@ -348,7 +1077,7 @@
             if (rules[i].typeObsel)
               if (rules[i].typeObsel.name !== obsel['@type'])
                 isInRange = false;
-              // Now we check the attributes
+            // Now we check the attributes
             var j = 0;
             while (isInRange && rules[i].attributes && j < rules[i].attributes.length) {
               // If the obsel actually possess the attribute of the rule, we check for the operators of the rule
