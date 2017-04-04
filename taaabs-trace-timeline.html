@@ -230,7 +230,7 @@ Do not forget to bind their begin and end time.
         this.$.pixijs.set('width', 1400);
         this.$.pixijs.set('height', this._getHeight());
         this.$.pixijs.init({
-          antialias: true,
+          antialias: false,
           backgroundColor: 0xFAFAFA
         });
         // Listen to pixi resize. TODO: manage iron-resize
@@ -259,6 +259,44 @@ Do not forget to bind their begin and end time.
         this._initBackgroundContainer();
         this._initObselsContainer();
         this._initSelectContainer();
+      },
+
+      /**
+       * Shift the obsels one column to the left or the right.
+       *
+       * @param {!required} new_obsels {String} List of the new obsels to display.
+       *
+       * @param {!required} direction {String} Left or right.
+       *
+       * @method shiftObsels
+       */
+      shiftObsels: function(new_obsels, direction) {
+        if(direction === 'left'){
+          this._obselsContainer.removeChildAt(0);
+          this._obselsContainers.splice(0,1);
+          for(var i = 0; i < this._obselsContainers.length; i++){
+            this._obselsContainers[i].c.x -= ( this._obselWidth + 2 );
+            this._obselsContainers[i]._intervalIndex = i;
+          }
+          var container = this._createContainer(this._obselsContainers.length);
+          var period = this._obselsContainers[0].e - this._obselsContainers[0].b;
+          var b = this._obselsContainers[this._obselsContainers.length - 1].e + 1;
+          var e = b + period;
+          this.push('_obselsContainers', {
+            "c": container,
+            "b": b,
+            "e": e,
+            "of": 0
+          });
+          console.log(container);
+          console.log((new Date(b)).toUTCString());
+          console.log((new Date(e)).toUTCString());
+          this._obselsContainer.addChild(this._obselsContainers[this._obselsContainers.length - 1].c);
+          this.addObsels(new_obsels);
+        }
+        else{
+
+        }
       },
 
       /**
