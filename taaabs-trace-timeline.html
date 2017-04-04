@@ -170,7 +170,7 @@ Do not forget to bind their begin and end time.
           value: function(){
             return new TaaabsTimeUtilities();
           }
-        }
+        },
 
         /**
          * Width of the pixijs component.
@@ -194,19 +194,28 @@ Do not forget to bind their begin and end time.
        *
        * @param {!required} list (Array) A list of obsels to display.
        *
-       * @method _setSelectContainerBehavior
+       * @method addObsels
        */
       addObsels: function(list) {
         var cIndex = 0;
         var oIndex = 0;
+        var overflow = 0;
         // For each obsel pile, check if its not full, then draw the obsel.
         for (cIndex = 0; cIndex < this._obselsContainers.length; cIndex++) {
+          overflow = 0;
           while (oIndex < list.length && this._obselsContainers[cIndex].b <= list[oIndex].obsel.begin && this._obselsContainers[cIndex].e > list[oIndex].obsel.end) {
             if (this._obselsContainers[cIndex].c.children.length < 20){
               this._obselsContainers[cIndex].c.addChild(this._createObsel(cIndex, list[oIndex]));
             }
+            else{
+              overflow ++;
+            }
             oIndex++;
           }
+          if(this._obselsContainers[cIndex].of > 0 && overflow > 0){
+            this._obselsContainers[cIndex].c.removeChildAt(this._obselsContainers[cIndex].c.children.length - 1);
+          }
+          this._manageObselContainerOverflow(this._obselsContainers[cIndex], overflow);
         }
       },
 
@@ -754,7 +763,8 @@ Do not forget to bind their begin and end time.
           this.push('_obselsContainers', {
             "c": container,
             "b": b,
-            "e": e
+            "e": e,
+            "of": 0
           });
           this._obselsContainer.addChild(container);
         }
@@ -851,6 +861,42 @@ Do not forget to bind their begin and end time.
           "keyup", key.upHandler.bind(key), false
         );
         return key;
+      },
+
+      /**
+       * Display, if necessary, the obsel obsels overflow on the container.
+       *
+       * @param {!required} container (PIXI.Container) The obsel container.
+       * @param {!required} overflow  (Number) The obsels overflow.
+       *
+       * @method _manageObselContainerOverflow
+       */
+      _manageObselContainerOverflow: function(container, overflow) {
+        if(overflow > 0){
+          overflow += container.of;
+          // TODO Use a var !
+          if(container.c.children.length === 20){
+            container.c.removeChildAt(container.c.children.length - 1);
+            overflow += 1;
+          }
+          // Add the text
+          container.of = overflow;
+          var t = new PIXI.Text("+"+overflow,{
+            fontFamily: "Arial",
+            fontSize: this._obselWidth,
+            fill: 0x000000,
+            align: "right"
+          });
+          t.anchor.set(0.5);
+          t.setTransform(null,null,null,null,-1.5708);
+          t.y = ( t.width / 2 ) + 2;
+          t.x = ( t.height / 2 ) + 1;
+          // Remove the two last obsels and add the counter
+          container.c.addChild(t);
+        }
+        else{
+          container.of = 0;
+        }
       },
 
       /**
