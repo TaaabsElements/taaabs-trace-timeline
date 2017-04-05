@@ -870,7 +870,12 @@ Do not forget to bind their begin and end time.
        * @method _intervalSelectSelected
        */
       _intervalSelectSelected: function(list){
-        // TODO: complete
+        var b = this._selectContainers[this._startSelectSelectedIndex].b;
+        var e = this._selectContainers[this._endSelectSelectedIndex].e;
+        this.fire('timeline-interval-selected', {
+          'b': b,
+          'e': e
+        })
       },
 
       /**
