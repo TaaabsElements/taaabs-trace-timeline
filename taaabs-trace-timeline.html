@@ -288,14 +288,28 @@ Do not forget to bind their begin and end time.
             "e": e,
             "of": 0
           });
-          console.log(container);
-          console.log((new Date(b)).toUTCString());
-          console.log((new Date(e)).toUTCString());
           this._obselsContainer.addChild(this._obselsContainers[this._obselsContainers.length - 1].c);
           this.addObsels(new_obsels);
         }
         else{
-
+          this._obselsContainer.removeChildAt(this._obselsContainer.children.length - 1);
+          this.splice('_obselsContainers', this._obselsContainers.length - 1, 1);
+          for(var i = 0; i < this._obselsContainers.length; i++){
+            this._obselsContainers[i].c.x += ( this._obselWidth + 2 );
+            this._obselsContainers[i]._intervalIndex = i + 1;
+          }
+          var container = this._createContainer(0);
+          var period = this._obselsContainers[0].e - this._obselsContainers[0].b;
+          var e = this._obselsContainers[0].b - 1;
+          var b = e - period;
+          this.splice('_obselsContainers',0,0, {
+            "c": container,
+            "b": b,
+            "e": e,
+            "of": 0
+          });
+          this._obselsContainer.addChildAt(this._obselsContainers[0].c,0);
+          this.addObsels(new_obsels);
         }
       },
 
