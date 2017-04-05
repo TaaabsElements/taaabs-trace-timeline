@@ -104,6 +104,28 @@ Do not forget to bind their begin and end time.
         },
 
         /**
+         * Begin bound text container.
+         *
+         * @attribute _beginBoundContainer
+         * @type Object
+         */
+        _beginBoundContainer: {
+         type: Object,
+         value: null
+        },
+
+        /**
+         * End bound text container.
+         *
+         * @attribute _endBoundContainer
+         * @type Object
+         */
+        _endBoundContainer: {
+         type: Object,
+         value: null
+        },
+
+        /**
          * (PIXI.Container) The main container of the `_obselsContainers`.
          *
          * @attribute _obselsContainer
@@ -259,6 +281,58 @@ Do not forget to bind their begin and end time.
         this._initBackgroundContainer();
         this._initObselsContainer();
         this._initSelectContainer();
+        this._setBoundsContainers();
+      },
+
+      _setBoundsContainers: function(){
+        var o = null;
+        if(this._beginBoundContainer === null){
+          var bc = new PIXI.Container();
+          bc.x = 4;
+          bc.y = 4;
+          this.set('_beginBoundContainer', bc);
+          o = new PIXI.Graphics();
+          o.x = 0;
+          o.y = 0;
+          this._beginBoundContainer.addChild(o);
+        }
+        this.$.pixijs.addToStage(this._beginBoundContainer);
+        if(this._endBoundContainer === null){
+          var ec = new PIXI.Container();
+          ec.x = this._width - 4;
+          ec.y = 4;
+          this.set('_endBoundContainer', ec);
+          o = new PIXI.Graphics();
+          o.x = 0;
+          o.y = 0;
+          this._endBoundContainer.addChild(o);
+        }
+        this.$.pixijs.addToStage(this._endBoundContainer);
+        if(this._beginBoundContainer.children.length > 1)this._beginBoundContainer.removeChildAt(1);
+        if(this._endBoundContainer.children.length > 1)    this._endBoundContainer.removeChildAt(1);
+        var bt = new PIXI.Text((new Date(this.begin)).toUTCString(),{
+          fontSize: 14,
+          align: 'left'
+        });
+        o = this._beginBoundContainer.getChildAt(0);
+        o.clear();
+        o.beginFill(0xFFFFFF);
+        o.drawRect(0,0,bt.width,bt.height);
+        o.lineStyle(2, 0x000000, 1);
+        o.endFill();
+        this._beginBoundContainer.addChild(bt);
+        var et = new PIXI.Text((new Date(this.end)).toUTCString(),{
+          fontSize: 14,
+          align: 'right'
+        });
+        o = this._endBoundContainer.getChildAt(0);
+        o.clear();
+        o.beginFill(0xFFFFFF);
+        o.drawRect(0,0,et.width,et.height);
+        o.lineStyle(2, 0x000000, 1);
+        o.endFill();
+        this._endBoundContainer.addChild(et);
+        this._endBoundContainer.x = this._width - et.width;
       },
 
       /**
