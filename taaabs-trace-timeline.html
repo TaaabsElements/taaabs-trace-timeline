@@ -241,6 +241,11 @@ Do not forget to bind their begin and end time.
         }
       },
 
+      redrawObsels: function(obsels){
+        this._initObselsContainer();
+        this.addObsels(obsels);
+      },
+
       /**
        * Initialize the visualization.
        *
@@ -415,11 +420,39 @@ Do not forget to bind their begin and end time.
         var o = new PIXI.Graphics();
         var y = (20 * (this._obselWidth + 1)) - ((this._obselWidth + 1) * this._obselsContainers[cIndex].c.children.length);
         o.beginFill(parseInt(obsel.symbol.color.replace('#',''), 16));
-        o.drawCircle((this._obselWidth + 2) / 2, (this._obselWidth + 2) / 2, this._obselWidth / 2);
+        switch (obsel.symbol.shape) {
+          case 'STAR':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(2 * this._obselWidth / 3, this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(2 * this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(0, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 3, this._obselWidth / 3)
+            ]);
+            break;
+          case 'CIRCLE':
+            o.drawCircle(this._obselWidth / 2, this._obselWidth / 2, this._obselWidth / 2);
+            break;
+          case 'SQUARE':
+            o.drawRect(0, 0, this._obselWidth, this._obselWidth);
+            break;
+          case 'DIAMOND':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(0, this._obselWidth / 2),
+            ]);
+            break;
+        }
         o.endFill();
         o.y = y;
         o.x = 1;
         o.originalColor = parseInt(obsel.symbol.color.replace('#',''), 16);
+        o.shape = obsel.symbol.shape;
         // Set interactivity
         o.interactive = true;
         o.buttonMode = true;
@@ -686,7 +719,34 @@ Do not forget to bind their begin and end time.
         o.clear();
         o.beginFill(o.originalColor);
         o.lineStyle(4, this._getComplementaryColor(o.originalColor), 1);
-        o.drawCircle((this._obselWidth + 2) / 2, (this._obselWidth + 2) / 2, this._obselWidth / 2);
+        switch (o.shape) {
+          case 'STAR':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(2 * this._obselWidth / 3, this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(2 * this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(0, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 3, this._obselWidth / 3)
+            ]);
+            break;
+          case 'CIRCLE':
+            o.drawCircle(this._obselWidth / 2, this._obselWidth / 2, this._obselWidth / 2);
+            break;
+          case 'SQUARE':
+            o.drawRect(0, 0, this._obselWidth, this._obselWidth);
+            break;
+          case 'DIAMOND':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(0, this._obselWidth / 2),
+            ]);
+            break;
+        }
         o.endFill();
       },
 
@@ -1053,7 +1113,34 @@ Do not forget to bind their begin and end time.
       _resetObsel: function(o) {
         o.clear();
         o.beginFill(o.originalColor);
-        o.drawCircle((this._obselWidth + 2) / 2, (this._obselWidth + 2) / 2, this._obselWidth / 2);
+        switch (o.shape) {
+          case 'STAR':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(2 * this._obselWidth / 3, this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(2 * this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(0, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 3, this._obselWidth / 3)
+            ]);
+            break;
+          case 'CIRCLE':
+            o.drawCircle(this._obselWidth / 2, this._obselWidth / 2, this._obselWidth / 2);
+            break;
+          case 'SQUARE':
+            o.drawRect(0, 0, this._obselWidth, this._obselWidth);
+            break;
+          case 'DIAMOND':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(0, this._obselWidth / 2),
+            ]);
+            break;
+        }
         o.endFill();
       },
 
