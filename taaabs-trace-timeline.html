@@ -226,11 +226,13 @@ Do not forget to bind their begin and end time.
         for (cIndex = 0; cIndex < this._obselsContainers.length; cIndex++) {
           overflow = 0;
           while (oIndex < list.length && this._obselsContainers[cIndex].b <= list[oIndex].obsel.begin && this._obselsContainers[cIndex].e > list[oIndex].obsel.end) {
-            if (this._obselsContainers[cIndex].c.children.length < 20){
-              this._obselsContainers[cIndex].c.addChild(this._createObsel(cIndex, list[oIndex]));
-            }
-            else{
-              overflow ++;
+            if(list[oIndex].visible){
+              if (this._obselsContainers[cIndex].c.children.length < 20){
+                this._obselsContainers[cIndex].c.addChild(this._createObsel(cIndex, list[oIndex]));
+              }
+              else{
+                overflow ++;
+              }
             }
             oIndex++;
           }
