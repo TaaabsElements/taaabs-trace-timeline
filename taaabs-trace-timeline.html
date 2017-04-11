@@ -392,6 +392,143 @@ Do not forget to bind their begin and end time.
           this._obselsContainer.addChildAt(this._obselsContainers[0].c,0);
           this.addObsels(new_obsels);
         }
+        this.set('begin', this._obselsContainers[0].b);
+        this.set('end', this._obselsContainers[this._obselsContainers.length - 1].e);
+        this._shiftBackgroundContainers(direction);
+      },
+
+      _shiftBackgroundContainers: function(direction){
+        if(direction === 'left'){
+          this._backgroundContainer.removeChildAt(0);
+          this._backgroundContainers.splice(0,1);
+          for(var i = 0; i < this._backgroundContainers.length; i++){
+            this._backgroundContainers[i].c.x -= ( this._obselWidth + 2 );
+            this._backgroundContainers[i]._intervalIndex = i;
+          }
+          var container = this._createContainer(this._backgroundContainers.length);
+          var period = this._backgroundContainers[0].e - this._backgroundContainers[0].b;
+          var b = this._backgroundContainers[this._backgroundContainers.length - 1].e + 1;
+          var e = b + period;
+          this.push('_backgroundContainers',{
+            "c": container,
+            "b": b,
+            "e": e
+          });
+          this._backgroundContainer.addChild(this._backgroundContainers[this._backgroundContainers.length - 1].c);
+          this._fillBackgroundContainer(this._backgroundContainers.length - 1);
+        }
+        else{
+          this._backgroundContainer.removeChildAt(this._backgroundContainer.children.length - 1);
+          this.splice('_backgroundContainers', this._backgroundContainers.length - 1, 1);
+          for(var i = 0; i < this._backgroundContainers.length; i++){
+            this._backgroundContainers[i].c.x += ( this._obselWidth + 2 );
+            this._backgroundContainers[i]._intervalIndex = i + 1;
+          }
+          var container = this._createContainer(0);
+          var period = this._backgroundContainers[0].e - this._backgroundContainers[0].b;
+          var e = this._backgroundContainers[0].b - 1;
+          var b = e - period;
+          this.splice('_backgroundContainers',0,0, {
+            "c": container,
+            "b": b,
+            "e": e
+          });
+          this._backgroundContainer.addChildAt(this._backgroundContainers[0].c,0);
+          this._fillBackgroundContainer(0);
+        }
+      },
+
+      _fillBackgroundContainer(index){
+        var c = this._backgroundContainers[index];
+        var oc = null;
+        if(index === 0){
+          var indexs = this._backgroundContainers[1].c.children.length - 1;
+          if(indexs > -1){
+            oc = this._backgroundContainers[1].c.getChildAt(indexs).originalColor;
+            if(this._backgroundContainers[1]._isRefFromBegin) oc =  (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+          }
+          else oc = 0xECEFF1;
+        }
+        else{
+          oc = this._backgroundContainers[index - 1].c.getChildAt(0).originalColor;
+          if(this._backgroundContainers[index - 1]._isRefFromEnd) oc =  (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+        }
+        var p = this._ttu.get_fittest_period(this.begin, this.end, 20);
+
+        var d = this._ttu.get_date_according_to_period(p, new Date(c.e));
+        console.log(d.valueOf());
+        console.log(c.b);
+        console.log(c.e);
+        if(d.valueOf() > c.b){
+          this._ttu.get_date_according_to_period(p, new Date(c.e));
+          var h = ((c.e-d.valueOf())*315)/(c.e-c.b);
+          var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+          var o1 = new PIXI.Graphics();
+          if(index === 0) {
+            o1.beginFill(oc);
+            o1.originalColor = oc;
+          }
+          else{
+             o1.beginFill(pcolor);
+             o1.originalColor = pcolor;
+          }
+          o1.drawRect(0, 0, this._obselWidth + 2, h);
+          o1.endFill();
+          o1.y = 0;
+          o1.x = 0;
+          this._backgroundContainers[index].c.addChild(o1);
+          var o2 = new PIXI.Graphics();
+          if(index !== 0) {
+            o2.beginFill(oc);
+            o2.originalColor = oc;
+          }
+          else{
+             o2.beginFill(pcolor);
+             o2.originalColor = pcolor;
+          }
+          o2.drawRect(0, 0, this._obselWidth + 2, 315-h);
+          o2.endFill();
+          o2.y = h;
+          o2.x = 0;
+          this._backgroundContainers[index].c.addChild(o2);
+          this._backgroundContainers[index]._isRefInMiddle = true;
+        }
+        else{
+          var o = new PIXI.Graphics();
+          if(d.valueOf() === this._backgroundContainers[index].b){
+            this._backgroundContainers[index]._isRefFromBegin = true;
+            if(index !== 0){
+              var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+              o.beginFill(pcolor);
+            }
+            else{
+              o.beginFill(oc);
+            }
+          }
+          else if(d.valueOf() === this._backgroundContainers[index].e) {
+            this._backgroundContainers[index]._isRefFromBegin = false;
+            this._backgroundContainers[index]._isRefFromEnd = true;
+            if(index === 0){
+              var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+              o.beginFill(pcolor);
+            }
+            else{
+              o.beginFill(oc);
+            }
+          }
+          else{
+            this._backgroundContainers[index]._isRefFromBegin = false;
+            this._backgroundContainers[index]._isRefFromEnd = false;
+            o.beginFill(oc);
+          }
+          o.drawRect(0, 0, this._obselWidth + 2, 315);
+          o.endFill();
+          o.y = 0;
+          o.x = 0;
+          o.originalColor = oc;
+          this._backgroundContainers[index].c.addChild(o);
+          this._backgroundContainers[index]._isRefInMiddle = false;
+        }
       },
 
       /**
@@ -492,64 +629,8 @@ Do not forget to bind their begin and end time.
        * @method _fillBackgroundContainers
        */
       _fillBackgroundContainers: function(){
-        // Retrieve the fitest period.
-        var p = this._ttu.get_fittest_period(this.begin, this.end, 20);
-        var colors = [0xECEFF1, 0xFAFAFA];
-        var color = 1;
-        // We set the variables
-        var b = this.begin;
-        var e = this.end;
-        var d = new Date(b);
-        d = this._ttu.get_date_according_to_period(p, d);
-        // We reset the _ttu repeater
-        this._ttu.set('beginDate', d);
-        this._ttu.set('interval', p);
-        this._ttu.resetIntervalRepeater();
-        // Result will define the bounds of every interval we create.
-        var result = {
-          'begin': d,
-          'end': d
-        };
-        var intervals = [];
-        var cIndex = 0;
-        // We create the intervals in a loop until we reach the end of the trace.
-        while (result.end.valueOf() < e) {
-          result = this._ttu.getNextIntervalUTC(null);
-          color = (color === 1) ? 0 : 1;
-          while(cIndex < this._backgroundContainers.length && this._backgroundContainers[cIndex].b >= result.begin.valueOf() && this._backgroundContainers[cIndex].e <= result.end.valueOf()){
-            var o = new PIXI.Graphics();
-            o.beginFill(colors[color]);
-            o.drawRect(0, 0, this._obselWidth + 2, 415);
-            o.endFill();
-            o.y = 0;
-            o.x = 0;
-
-            this._backgroundContainers[cIndex].c.addChild(o);
-            cIndex++;
-          }
-          if(cIndex < this._backgroundContainers.length && this._backgroundContainers[cIndex].e > result.end.valueOf()){
-            var b1 = this._backgroundContainers[cIndex].b;
-            var e1 = this._backgroundContainers[cIndex].e;
-            var b2 = result.begin;
-            var e2 = result.end;
-            var h = (e1 - e2)/(e1 - b1) * 315;
-            var pcolor = (color === 0) ? 1 : 0;
-            var o = new PIXI.Graphics();
-            o.beginFill(colors[pcolor]);
-            o.drawRect(0, 0, this._obselWidth + 2, h);
-            o.endFill();
-            o.y = 0;
-            o.x = 0;
-            this._backgroundContainers[cIndex].c.addChild(o);
-            o = new PIXI.Graphics();
-            o.beginFill(colors[color]);
-            o.drawRect(0, 0, this._obselWidth + 2, 315 - h);
-            o.endFill();
-            o.y = h;
-            o.x = 0;
-            this._backgroundContainers[cIndex].c.addChild(o);
-            cIndex++;
-          }
+        for(var i = 0; i < this._backgroundContainers.length; i++){
+          this._fillBackgroundContainer(i);
         }
       },
 
@@ -761,10 +842,12 @@ Do not forget to bind their begin and end time.
       _initBackgroundContainer: function(){
         // If the background container already exists, we delete it.
         if(this._backgroundContainer){
-          this.$.pixijs.removeChildFromStage(this._backgroundContainer);
+          this._backgroundContainer.removeChildren();
         }
-        // Create & set the background main container.
-        this.set('_backgroundContainer', new PIXI.Container());
+        else{
+          // Create & set the background main container.
+          this.set('_backgroundContainer', new PIXI.Container());
+        }
         this._backgroundContainer.x = 0;
         this._backgroundContainer.y = 0;
         this._backgroundContainer.width = this._width;
