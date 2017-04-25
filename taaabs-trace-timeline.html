@@ -12,9 +12,10 @@ Do not forget to bind their begin and end time.
   <style>
      :host {
       display: block;
+      width: 100%;
     }
      :host #pixijs {
-      width: 1000px;
+      width: 100%;
     }
   </style>
   <template>
@@ -136,6 +137,11 @@ Do not forget to bind their begin and end time.
           value: ""
         },
 
+        _maxObselsInPile: {
+          type: Number,
+          value: 26
+        },
+
         /**
          * Maximum number of period (weeks, days, etc) displayed in the timeline (background container).
          *
@@ -191,6 +197,11 @@ Do not forget to bind their begin and end time.
          value: 0
         },
 
+        _obselsList: {
+          type: Array,
+          value: []
+        },
+
         /**
          * Width of an obsel graphic representation (PIXI.Graphics).
          *
@@ -200,6 +211,17 @@ Do not forget to bind their begin and end time.
         _obselWidth: {
           type: Number,
           value: 14
+        },
+
+        /**
+         * Timeout form the `_onResize` function.
+         *
+         * @attribute _resizeTimeout
+         * @type Object
+         */
+        _resizeTimeout: {
+         type: Object,
+         value: null
         },
 
         /**
@@ -251,9 +273,19 @@ Do not forget to bind their begin and end time.
         }
       },
 
-      listeners: {},
+      behaviors: [
+        Polymer.IronResizableBehavior
+      ],
+
+      listeners: {
+        'iron-resize': '_onResize'
+      },
 
       ready: function() {},
+
+      attached: function(){
+        this._onResize();
+      },
 
       /**
        * Add some obsels to the timeline. Calls `_createObsel`.
@@ -263,6 +295,8 @@ Do not forget to bind their begin and end time.
        * @method addObsels
        */
       addObsels: function(list) {
+        for(var i = 0; i < list.length; i++)
+          this.push('_obselsList', list[i]);
         var cIndex = 0;
         var oIndex = 0;
         var overflow = 0;
@@ -271,7 +305,7 @@ Do not forget to bind their begin and end time.
           overflow = 0;
           while (oIndex < list.length && this._obselsContainers[cIndex].b <= list[oIndex].obsel.begin && this._obselsContainers[cIndex].e > list[oIndex].obsel.end) {
             if(list[oIndex].visible){
-              if (this._obselsContainers[cIndex].c.children.length < 20){
+              if (this._obselsContainers[cIndex].c.children.length < this._maxObselsInPile){
                 this._obselsContainers[cIndex].c.addChild(this._createObsel(cIndex, list[oIndex]));
               }
               else{
@@ -294,17 +328,7 @@ Do not forget to bind their begin and end time.
        */
       initVisu: function() {
         // Set the pixijs component
-        this.set('_width', 1400);
-        this.$.pixijs.set('width', 1400);
-        this.$.pixijs.set('height', this._getHeight());
-        this.$.pixijs.init({
-          antialias: false,
-          backgroundColor: 0xFAFAFA
-        });
-        // Listen to pixi resize. TODO: manage iron-resize
-        //this.listen(this.$.pixijs, 'iron-resize', '_onPixiJsResize');
-        //this.set('_width', this.$.pixijs.clientWidth);
-        // Initialize the keyboard behavior
+        this.resizeVisu();
         this._initKeyboard();
       },
 
@@ -318,6 +342,24 @@ Do not forget to bind their begin and end time.
       redrawObsels: function(obsels){
         this._initObselsContainer();
         this.addObsels(obsels);
+      },
+
+      /**
+       * Resize the pixijs component according to the offsetWidth.
+       *
+       * @method resizeVisu
+       */
+      resizeVisu: function(){
+        // Set the pixijs component
+        this.set('_width', this.offsetWidth);
+        this.set('_height', this.offsetHeight);
+        this.set('_maxObselsInPile', (Math.floor(this._height / (this._obselWidth + 1)))-1);
+        this.$.pixijs.set('width', this.offsetWidth);
+        this.$.pixijs.set('height', this.offsetHeight);
+        this.$.pixijs.init({
+          antialias: false,
+          backgroundColor: 0xFAFAFA
+        });
       },
 
       /**
@@ -547,7 +589,7 @@ Do not forget to bind their begin and end time.
         var d = this._ttu.get_date_according_to_period( this.get('_fittestPeriod'), new Date(c.e));
         if(d.valueOf() > c.b){
           this._ttu.get_date_according_to_period(this.get('_fittestPeriod'), new Date(c.e));
-          var h = ((c.e-d.valueOf())*315)/(c.e-c.b);
+          var h = ((c.e-d.valueOf())*this._height)/(c.e-c.b);
           var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
           var o1 = new PIXI.Graphics();
           if(index === 0) {
@@ -572,7 +614,7 @@ Do not forget to bind their begin and end time.
              o2.beginFill(pcolor);
              o2.originalColor = pcolor;
           }
-          o2.drawRect(0, 0, this._obselWidth + 2, 315-h);
+          o2.drawRect(0, 0, this._obselWidth + 2, this._height-h);
           o2.endFill();
           o2.y = h;
           o2.x = 0;
@@ -607,7 +649,7 @@ Do not forget to bind their begin and end time.
             this._backgroundContainers[index]._isRefFromEnd = false;
             o.beginFill(oc);
           }
-          o.drawRect(0, 0, this._obselWidth + 2, 315);
+          o.drawRect(0, 0, this._obselWidth + 2, this._height);
           o.endFill();
           o.y = 0;
           o.x = 0;
@@ -643,7 +685,7 @@ Do not forget to bind their begin and end time.
        */
       _createObsel: function(cIndex, obsel) {
         var o = new PIXI.Graphics();
-        var y = (20 * (this._obselWidth + 1)) - ((this._obselWidth + 1) * this._obselsContainers[cIndex].c.children.length);
+        var y = this._height - ((this._obselWidth + 1) * (this._obselsContainers[cIndex].c.children.length + 1));
         o.beginFill(parseInt(obsel.symbol.color.replace('#',''), 16));
         switch (obsel.symbol.shape) {
           case 'STAR':
@@ -731,7 +773,7 @@ Do not forget to bind their begin and end time.
         if(container.children.length === 0){
           var g = new PIXI.Graphics();
           g.beginFill(0x039BE5);
-          g.drawRect(0, 0, this._obselWidth + 2, 315);
+          g.drawRect(0, 0, this._obselWidth + 2, this._height);
           g.alpha = 0.37;
           g.endFill();
           g.x = 0;
@@ -874,7 +916,7 @@ Do not forget to bind their begin and end time.
        * @method _getHeight
        */
       _getHeight: function() {
-        return 315;
+        return this._height;
       },
 
       /**
@@ -937,7 +979,7 @@ Do not forget to bind their begin and end time.
         this._backgroundContainer.x = 0;
         this._backgroundContainer.y = 0;
         this._backgroundContainer.width = this._width;
-        this._backgroundContainer.height = 315;
+        this._backgroundContainer.height = this._height;
         // Calculate the subdivisions of the background container.
         var period = this.get('_obselsContainersDuration');
         this.set('_backgroundContainers', []);
@@ -1105,11 +1147,14 @@ Do not forget to bind their begin and end time.
         this._obselsContainer.x = 0;
         this._obselsContainer.y = 0;
         this._obselsContainer.width = this._width;
-        this._obselsContainer.height = 315;
+        this._obselsContainer.height = this._height;
         // Calculate the intervals and create the sub-containers.
         var contCount = this._width / (this._obselWidth + 2);
         var duration = this.end - this.begin;
         var period = Math.ceil(duration / contCount);
+        console.log(contCount);
+        console.log(duration);
+        console.log(period);
         this.set('_obselsContainers', []);
         for (var i = 0; i < contCount; i++) {
           var b = this.begin + (period * i);
@@ -1142,7 +1187,7 @@ Do not forget to bind their begin and end time.
         this._selectContainer.x = 0;
         this._selectContainer.y = 0;
         this._selectContainer.width = this._width;
-        this._selectContainer.height = 315;
+        this._selectContainer.height = this._height;
         // Divide the timeline in n sub container of the size of one obsel symbol.
         // In this way, we'll select a pile of obsel one at a time.
         var contCount = this._width / (this._obselWidth + 2);
@@ -1235,7 +1280,7 @@ Do not forget to bind their begin and end time.
         if(overflow > 0){
           overflow += container.of;
           // TODO Use a var !
-          if(container.c.children.length === 20){
+          if(container.c.children.length === this._maxObselsInPile){
             container.c.removeChildAt(container.c.children.length - 1);
             overflow += 1;
           }
@@ -1270,6 +1315,30 @@ Do not forget to bind their begin and end time.
           this.set('_width', this.$.pixijs.clientWidth);
           this.updateVisu();
         }.bind(this), 500);
+      },
+
+      /**
+       * Remove the pixijs element, and call the resizing process inside a timeout stored in `_resizeTimeout`.
+       * Clear the existing `_resizeTimeout` if there's already one.
+       *
+       * @method _onResize
+       */
+      _onResize: function(){
+        // Hide the pixijs component to retrieve the real offset bounds.
+        this.$.pixijs.style.display = 'none';
+        // Clear the previous resizing timeout. If it's null, won't trigger any error \o/.
+        clearTimeout(this.get('_resizeTimeout'));
+        // Set the new timeout.
+        // First call `resizeVisu`. Then retrieve the stored obsels. Clean the `_obselsList` property.
+        // Finally redraw the obsels and show the timeline back.
+        this.set('_resizeTimeout', setTimeout(function(){
+          this.resizeVisu();
+          this.setTemporalBounds(this.begin, this.end);
+          var l = this.get('_obselsList');
+          this.set('_obselsList', []);
+          this.redrawObsels(l);
+          this.$.pixijs.style.display = 'block';
+        }.bind(this), 200));
       },
 
       /**
@@ -1324,7 +1393,7 @@ Do not forget to bind their begin and end time.
       _setSelectContainerBehavior: function(container){
         // Set the container interactive.
         container.interactive = true;
-        container.hitArea = new PIXI.Rectangle(0, 0, this._obselWidth + 2, 315);
+        container.hitArea = new PIXI.Rectangle(0, 0, this._obselWidth + 2, this._height);
         // On mouse over :
         // I.   _lastHoverSelectIndex <- the tile index & _lastHoverTime -> Date.now()
         //
