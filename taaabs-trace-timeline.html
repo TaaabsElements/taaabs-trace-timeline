@@ -1152,9 +1152,6 @@ Do not forget to bind their begin and end time.
         var contCount = this._width / (this._obselWidth + 2);
         var duration = this.end - this.begin;
         var period = Math.ceil(duration / contCount);
-        console.log(contCount);
-        console.log(duration);
-        console.log(period);
         this.set('_obselsContainers', []);
         for (var i = 0; i < contCount; i++) {
           var b = this.begin + (period * i);
@@ -1310,7 +1307,6 @@ Do not forget to bind their begin and end time.
        * @method _onPixiJsResize
        */
       _onPixiJsResize: function() {
-        console.log('resize?');
         this.async(function(evt) {
           this.set('_width', this.$.pixijs.clientWidth);
           this.updateVisu();
