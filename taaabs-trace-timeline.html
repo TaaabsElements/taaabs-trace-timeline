@@ -1,7 +1,7 @@
 <link rel="import" href="../iron-resizable-behavior/iron-resizable-behavior.html">
 <link rel="import" href="../pixi-js-component/pixi-js-component.html">
 <link rel="import" href="../taaabs-time-utilities/taaabs-time-utilities.html">
-
+<link rel="import" href="../taaabs-taaabs/taaabs-taaabs.html">
 <!--
 `<taaabs-trace-timeline>` is a graphical elements that displays a timeline for a kTBS trace.
 
@@ -29,10 +29,13 @@ Do not forget to bind their begin and end time.
      * @event selected-obsel
      */
 
-    Polymer({
+    TAAABS.TraceTimeline = Polymer({
       is: 'taaabs-trace-timeline',
 
       properties: {
+
+        /** ================================================================ **/
+        /**                         PUBLIC PROPERTIES                        **/
 
         /**
          * Begin time of the trace.
@@ -82,6 +85,9 @@ Do not forget to bind their begin and end time.
          value: null
         },
 
+        /** ================================================================ **/
+        /**                        PRIVATE PROPERTIES                        **/
+
         /**
          * (PIXI.Container) Main container of the `_backgroundContainers`.
          *
@@ -127,6 +133,50 @@ Do not forget to bind their begin and end time.
         },
 
         /**
+         * (PIXI.Container) The main container of the `_obselsContainers`.
+         *
+         * @attribute _obselsContainer
+         * @type Object
+         */
+        _obselsContainer: {
+          type: Object,
+          value: null
+        },
+
+        /**
+         * List of PIXI.Container that represent a pile of obsels on the timeline.
+         *
+         * @attribute _obselsContainers
+         * @type Array
+         */
+        _obselsContainers: {
+          type: Array,
+          value: []
+        },
+
+        /**
+         * (PIXI.Container) Main container of the `_selectContainers`.
+         *
+         * @attribute _selectContainer
+         * @type Object
+         */
+        _selectContainer: {
+          type: Object,
+          value: null
+        },
+
+        /**
+         * List of the select containers.
+         *
+         * @attribute _selectContainers
+         * @type Array
+         */
+        _selectContainers: {
+          type: Array,
+          value: []
+        },
+
+        /**
          * Fittest period between `begin` and `end`.
          *
          * @attribute _fittestPeriod
@@ -154,28 +204,6 @@ Do not forget to bind their begin and end time.
         },
 
         /**
-         * (PIXI.Container) The main container of the `_obselsContainers`.
-         *
-         * @attribute _obselsContainer
-         * @type Object
-         */
-        _obselsContainer: {
-         type: Object,
-         value: null
-        },
-
-        /**
-         * List of PIXI.Container that represent a pile of obsels on the timeline.
-         *
-         * @attribute _obselsContainers
-         * @type Array
-         */
-        _obselsContainers: {
-          type: Array,
-          value: []
-        },
-
-        /**
          * Number of obsel containers.
          *
          * @attribute _obselsContainersCount
@@ -197,6 +225,12 @@ Do not forget to bind their begin and end time.
          value: 0
         },
 
+        /**
+         * Obsels list.
+         *
+         * @attribute _obselsList
+         * @type Array
+         */
         _obselsList: {
           type: Array,
           value: []
@@ -225,28 +259,6 @@ Do not forget to bind their begin and end time.
         },
 
         /**
-         * (PIXI.Container) Main container of the `_selectContainers`.
-         *
-         * @attribute _selectContainer
-         * @type Object
-         */
-        _selectContainer: {
-         type: Object,
-         value: null
-        },
-
-        /**
-         * List of the select containers.
-         *
-         * @attribute _selectContainers
-         * @type Array
-         */
-        _selectContainers: {
-         type: Array,
-         value: []
-        },
-
-        /**
          * TaaabsTimeUtilities.
          *
          * @attribute _ttu
@@ -256,7 +268,7 @@ Do not forget to bind their begin and end time.
           type: Object,
           notify: true,
           value: function(){
-            return new TaaabsTimeUtilities();
+            return new TAAABS.TimeUtilities();
           }
         },
 
@@ -281,10 +293,312 @@ Do not forget to bind their begin and end time.
         'iron-resize': '_onResize'
       },
 
-      ready: function() {},
+      /** ================================================================== **/
+      /**                     CONSTRUCTORS / DESTRUCTORS                     **/
 
+      /**
+       * Default constructor. Calls `_emptyAllProperties`.
+       *
+       * @method factoryImpl
+       */
+      factoryImpl: function() {
+        this._emptyAllProperties();
+      },
+
+      /**
+       * Calls `_emptyAllProperties`.
+       *
+       * @method ready
+       **/
+      ready: function() {
+        this._emptyAllProperties();
+      },
+
+      /**
+       * Calls `_onResize`.
+       *
+       * @method attached
+       **/
       attached: function(){
         this._onResize();
+      },
+
+      /**
+       * Stop the downloads and calls `_emptyAllProperties`.
+       * Also calls `clear` on the pixijs component.
+       *
+       * @method ready
+       */
+      clear: function(){
+        this._emptyAllProperties();
+        this.$.pixijs.clear();
+      },
+
+      /**
+       * Set all the properties to their default value.
+       *
+       * @method _emptyAllProperties
+       */
+      _emptyAllProperties: function(){
+        this.set('_backgroundContainer'     , null);
+        this.set('_backgroundContainers'    , []  );
+        this.set('_beginBoundContainer'     , null);
+        this.set('_endBoundContainer'       , null);
+        this.set('_fittestPeriod'           , ""  );
+        this.set('_maxObselsInPile'         , 26  );
+        this.set('_maxPeriodCount'          , 20  );
+        this.set('_obselsContainer'         , null);
+        this.set('_obselsContainers'        , []);
+        this.set('_obselsContainersCount'   , 0);
+        this.set('_obselsContainersDuration', 0);
+        this.set('_obselsList'              , []);
+        this.set('_obselWidth'              , 14);
+        this.set('_resizeTimeout'           , null);
+        this.set('_selectContainer'         , null);
+        this.set('_selectContainers'        , []);
+        this.set('_ttu'                     , new TAAABS.TimeUtilities());
+      },
+
+      /** ================================================================== **/
+      /**                           INITIALIZATION                           **/
+
+      /**
+       * Initialize the visualization.
+       *
+       * @method initVisu
+       */
+      initVisu: function() {
+        // Set the pixijs component
+        this.resizeVisu();
+        this._initKeyboard();
+      },
+
+      /**
+       * Resize the pixijs component according to the offsetWidth.
+       *
+       * @method resizeVisu
+       */
+      resizeVisu: function(){
+        // Set the pixijs component
+        this.set('_width', this.offsetWidth);
+        this.set('_height', this.offsetHeight);
+        this.set('_maxObselsInPile', (Math.floor(this._height / (this._obselWidth + 1)))-1);
+        this.$.pixijs.set('width', this.offsetWidth);
+        this.$.pixijs.set('height', this.offsetHeight);
+        this.$.pixijs.init({
+          antialias: false,
+          backgroundColor: 0xFAFAFA
+        });
+      },
+
+      /**
+       * Init the keyboard listeners to set the behavior on arrow keys.
+       * The user will be allowed to move in the timeline using the arrow keys.
+       *
+       * @method _initKeyboard
+       */
+      _initKeyboard: function() {
+        // Set the keyboard listeners.
+        var left = this._keyboard(37),
+          up = this._keyboard(38),
+          right = this._keyboard(39),
+          down = this._keyboard(40);
+        // Up behavior
+        up.press = function() {
+          if(this.selectedObsel){
+            var oIndex = this.selectedObsel._oIndex;
+            var cIndex = this.selectedObsel._cIndex;
+            if(oIndex + 1 < this._obselsContainers[cIndex].c.children.length){
+              var no = this._obselsContainers[cIndex].c.getChildAt(oIndex + 1);
+              this._highlightObsel(no);
+              this._resetObsel(this.selectedObsel);
+              no._selected = true;
+              this.selectedObsel._selected = false;
+              this.set('selectedObsel' , no);
+              this.set('_lastObselIndex', oIndex + 1);
+              this.fire('selected-obsel');
+            }
+            else{
+              cIndex++;
+              while(cIndex < this._obselsContainers.length && this._obselsContainers[cIndex].c.children.length === 0){
+                cIndex++;
+              }
+              if(cIndex < this._obselsContainers.length){
+                var no = this._obselsContainers[cIndex].c.getChildAt(0);
+                this._highlightObsel(no);
+                this._resetObsel(this.selectedObsel);
+                no._selected = true;
+                this.selectedObsel._selected = false;
+                this.set('selectedObsel' , no);
+                this.set('_lastObselIndex', 0);
+                this.fire('selected-obsel');
+              }
+            }
+          }
+        }.bind(this);
+
+        down.press = function() {
+          if(this.selectedObsel){
+            var oIndex = this.selectedObsel._oIndex;
+            var cIndex = this.selectedObsel._cIndex;
+            if(oIndex - 1 >= 0){
+              var no = this._obselsContainers[cIndex].c.getChildAt(oIndex - 1);
+              this._highlightObsel(no);
+              this._resetObsel(this.selectedObsel);
+              no._selected = true;
+              this.selectedObsel._selected = false;
+              this.set('selectedObsel', no);
+              this.set('_lastObselIndex', oIndex - 1);
+              this.fire('selected-obsel');
+            }
+            else{
+              cIndex--;
+              while(cIndex >= 0 && this._obselsContainers[cIndex].c.children.length === 0){
+                cIndex--;
+              }
+              if(cIndex >= 0){
+                var no = this._obselsContainers[cIndex].c.getChildAt(this._obselsContainers[cIndex].c.children.length - 1);
+                this._highlightObsel(no);
+                this._resetObsel(this.selectedObsel);
+                no._selected = true;
+                this.selectedObsel._selected = false;
+                this.set('selectedObsel', no);
+                this.set('_lastObselIndex', this._obselsContainers[cIndex].c.children.length - 1);
+                this.fire('selected-obsel');
+              }
+            }
+          }
+        }.bind(this);
+
+        right.press = function() {
+          if(this.selectedObsel){
+            var oIndex = this.selectedObsel._oIndex;
+            var cIndex = this.selectedObsel._cIndex;
+            cIndex++;
+            while(cIndex < this._obselsContainers.length && this._obselsContainers[cIndex].c.children.length === 0){
+              cIndex++;
+            }
+            if(cIndex < this._obselsContainers.length){
+              var no;
+              if( this._lastObselIndex < this._obselsContainers[cIndex].c.children.length){
+                no = this._obselsContainers[cIndex].c.getChildAt(this._lastObselIndex);
+              }
+              else{
+                no = this._obselsContainers[cIndex].c.getChildAt(this._obselsContainers[cIndex].c.children.length - 1);
+              }
+              this._highlightObsel(no);
+              this._resetObsel(this.selectedObsel);
+              no._selected = true;
+              this.selectedObsel._selected = false;
+              this.set('selectedObsel', no);
+              this.fire('selected-obsel');
+            }
+          }
+        }.bind(this);
+
+        left.press = function() {
+          if(this.selectedObsel){
+            var oIndex = this.selectedObsel._oIndex;
+            var cIndex = this.selectedObsel._cIndex;
+            cIndex--;
+            while(cIndex >= 0 && this._obselsContainers[cIndex].c.children.length === 0){
+              cIndex--;
+            }
+            if(cIndex >= 0){
+              var no;
+              if( this._lastObselIndex < this._obselsContainers[cIndex].c.children.length){
+                no = this._obselsContainers[cIndex].c.getChildAt(this._lastObselIndex);
+              }
+              else{
+                no = this._obselsContainers[cIndex].c.getChildAt(this._obselsContainers[cIndex].c.children.length - 1);
+              }
+              this._highlightObsel(no);
+              this._resetObsel(this.selectedObsel);
+              no._selected = true;
+              this.selectedObsel._selected = false;
+              this.set('selectedObsel', no);
+              this.fire('selected-obsel');
+            }
+          }
+        }.bind(this);
+      },
+
+      /**
+       * This function aims to calibrate the timeline on new begin/end timestamps.
+       * Set the begin & end of the `taaabs-trace-timeline`.
+       * Calls `_initBackgroundContainer`, `_initObselsContainer` & `_initSelectContainer`.
+       *
+       * @param {!required} begin (Number) The begin timestamp.
+       * @param {!required} end   (Number) The end timestamp.
+       *
+       * @method setTemporalBounds
+       */
+      setTemporalBounds: function(begin, end){
+        this.set('begin', begin);
+        this.set('end', end);
+        // Clear the timeline
+        this.$.pixijs.clearStage();
+        // Init everything
+        this._calculateFittestPeriod();
+        this._calculateObselsContainersDuration();
+        this._initBackgroundContainer();
+        this._initObselsContainer();
+        this._initSelectContainer();
+        this._displayBoundsContainers();
+      },
+
+      /** ================================================================== **/
+      /**                               RESIZING                             **/
+
+      /**
+       * Change `_width` according to the pixi width.
+       *
+       * @method _onPixiJsResize
+       */
+      _onPixiJsResize: function() {
+        this.async(function(evt) {
+          this.set('_width', this.$.pixijs.clientWidth);
+          this.updateVisu();
+        }.bind(this), 500);
+      },
+
+      /**
+       * Remove the pixijs element, and call the resizing process inside a timeout stored in `_resizeTimeout`.
+       * Clear the existing `_resizeTimeout` if there's already one.
+       *
+       * @method _onResize
+       */
+      _onResize: function(){
+        // Hide the pixijs component to retrieve the real offset bounds.
+        this.$.pixijs.style.display = 'none';
+        // Clear the previous resizing timeout. If it's null, won't trigger any error \o/.
+        clearTimeout(this.get('_resizeTimeout'));
+        // Set the new timeout.
+        // First call `resizeVisu`. Then retrieve the stored obsels. Clean the `_obselsList` property.
+        // Finally redraw the obsels and show the timeline back.
+        this.set('_resizeTimeout', setTimeout(function(){
+          this.resizeVisu();
+          this.setTemporalBounds(this.begin, this.end);
+          var l = this.get('_obselsList');
+          this.set('_obselsList', []);
+          this.redrawObsels(l);
+          this.$.pixijs.style.display = 'block';
+        }.bind(this), 200));
+      },
+
+      /** ================================================================== **/
+      /**                           OBSELS MANAGING                          **/
+
+      /**
+       * Simple init the obsel container and add the obsels.
+       *
+       * @param {!required} obsels (Array) A list of obsels to display.
+       *
+       * @method redrawObsels
+       */
+      redrawObsels: function(obsels){
+        this._initObselsContainer();
+        this.addObsels(obsels);
       },
 
       /**
@@ -322,68 +636,39 @@ Do not forget to bind their begin and end time.
       },
 
       /**
-       * Initialize the visualization.
+       * Display, if necessary, the obsel obsels overflow on the container.
        *
-       * @method initVisu
+       * @param {!required} container (PIXI.Container) The obsel container.
+       * @param {!required} overflow  (Number) The obsels overflow.
+       *
+       * @method _manageObselContainerOverflow
        */
-      initVisu: function() {
-        // Set the pixijs component
-        this.resizeVisu();
-        this._initKeyboard();
-      },
-
-      /**
-       * Simple init the obsel container and add the obsels.
-       *
-       * @param {!required} obsels (Array) A list of obsels to display.
-       *
-       * @method redrawObsels
-       */
-      redrawObsels: function(obsels){
-        this._initObselsContainer();
-        this.addObsels(obsels);
-      },
-
-      /**
-       * Resize the pixijs component according to the offsetWidth.
-       *
-       * @method resizeVisu
-       */
-      resizeVisu: function(){
-        // Set the pixijs component
-        this.set('_width', this.offsetWidth);
-        this.set('_height', this.offsetHeight);
-        this.set('_maxObselsInPile', (Math.floor(this._height / (this._obselWidth + 1)))-1);
-        this.$.pixijs.set('width', this.offsetWidth);
-        this.$.pixijs.set('height', this.offsetHeight);
-        this.$.pixijs.init({
-          antialias: false,
-          backgroundColor: 0xFAFAFA
-        });
-      },
-
-      /**
-       * This function aims to calibrate the timeline on new begin/end timestamps.
-       * Set the begin & end of the `taaabs-trace-timeline`.
-       * Calls `_initBackgroundContainer`, `_initObselsContainer` & `_initSelectContainer`.
-       *
-       * @param {!required} begin (Number) The begin timestamp.
-       * @param {!required} end   (Number) The end timestamp.
-       *
-       * @method setTemporalBounds
-       */
-      setTemporalBounds: function(begin, end){
-        this.set('begin', begin);
-        this.set('end', end);
-        // Clear the timeline
-        this.$.pixijs.clearStage();
-        // Init everything
-        this._calculateFittestPeriod();
-        this._calculateObselsContainersDuration();
-        this._initBackgroundContainer();
-        this._initObselsContainer();
-        this._initSelectContainer();
-        this._displayBoundsContainers();
+      _manageObselContainerOverflow: function(container, overflow) {
+        if(overflow > 0){
+          overflow += container.of;
+          // TODO Use a var !
+          if(container.c.children.length === this._maxObselsInPile){
+            container.c.removeChildAt(container.c.children.length - 1);
+            overflow += 1;
+          }
+          // Add the text
+          container.of = overflow;
+          var t = new PIXI.Text("+"+overflow,{
+            fontFamily: "Arial",
+            fontSize: this._obselWidth,
+            fill: 0x000000,
+            align: "right"
+          });
+          t.anchor.set(0.5);
+          t.setTransform(null,null,null,null,-1.5708);
+          t.y = ( t.width / 2 ) + 2;
+          t.x = ( t.height / 2 ) + 1;
+          // Remove the two last obsels and add the counter
+          container.c.addChild(t);
+        }
+        else{
+          container.of = 0;
+        }
       },
 
       /**
@@ -425,253 +710,6 @@ Do not forget to bind their begin and end time.
         this.set('begin', this._obselsContainers[0].b);
         this.set('end', this._obselsContainers[this._obselsContainers.length - 1].e);
         this._shiftBackgroundContainers(direction);
-      },
-
-      /**
-       * Calculate the fittest period betwwen `begin` and `end`.
-       * Sets `_fittestPeriod`
-       *
-       * @method _calculateFittestPeriod
-       */
-      _calculateFittestPeriod: function(){
-        var p = this._ttu.get_fittest_period(this.begin, this.end, this.get('_maxPeriodCount'));
-        this.set('_fittestPeriod', p);
-      },
-
-      /**
-       * Calculate an obsel container duration.
-       * Sets `_obselsContainersDuration`
-       *
-       * @method _calculateObselsContainersDuration
-       */
-      _calculateObselsContainersDuration: function(){
-        var contCount = this._width / (this._obselWidth + 2);
-        var duration = this.end - this.begin;
-        var period = Math.ceil(duration / contCount);
-        this.set('_obselsContainersCount', contCount);
-        this.set('_obselsContainersDuration', period);
-      },
-
-      /**
-       * Create a bound container.
-       *
-       * @param {!required} isBegin {Boolean} True if the bound correspond to the begin bound. False otherwise.
-       *
-       * @method _createBoundContainer
-       */
-      _createBoundContainer: function(isBegin){
-        var c = new PIXI.Container();
-        c.x = (isBegin) ? 4 : this._width - 4;
-        c.y = 4;
-        var o = new PIXI.Graphics();
-        o.x = o.y = 0;
-        c.addChild(o);
-        if(isBegin) this.set('_beginBoundContainer', c);
-        else        this.set('_endBoundContainer', c);
-      },
-
-      /**
-       * Display the two bounds value.
-       *
-       * @method _displayBoundsContainers
-       */
-      _displayBoundsContainers: function(){
-        var o = null;
-        // Create the bounds containers if they do not exist yet.
-        if(this._beginBoundContainer === null) this._createBoundContainer(true);
-        if(this._endBoundContainer === null) this._createBoundContainer(false);
-        // Add the bound containers to the stage.
-        this.$.pixijs.addToStage(this._beginBoundContainer);
-        this.$.pixijs.addToStage(this._endBoundContainer);
-        // Remove the text if the bounds containers already have one.
-        if(this._beginBoundContainer.children.length > 1) this._beginBoundContainer.removeChildAt(1);
-        if(this._endBoundContainer.children.length > 1)   this._endBoundContainer.removeChildAt(1);
-        // Fill the bounds containers
-        this._fillBoundContainer((new Date(this.begin)).toUTCString(), true);
-        this._fillBoundContainer((new Date(this.end)).toUTCString(), false);
-      },
-
-      /**
-       * Fill a bound container with its value.
-       *
-       * @param {!required} text {Boolean} The text to display.
-       * @param {!required} isBegin {Boolean} True if the bound correspond to the begin bound. False otherwise.
-       *
-       * @method _fillBoundContainer
-       */
-      _fillBoundContainer: function(text, isBegin){
-        // Create the PIXI.Text
-        var c, align;
-        if(isBegin){
-          align = 'left';
-          c = this._beginBoundContainer;
-        }
-        else{
-          align = 'right';
-          c = this._endBoundContainer;
-        }
-        var t = new PIXI.Text(text,{
-          fontSize: 14,
-          align: align
-        });
-        // Refill the text background with the right size.
-        var  o = c.getChildAt(0);
-        o.clear();
-        o.beginFill(0xFFFFFF);
-        o.drawRect(0, 0, t.width, t.height);
-        o.lineStyle(2, 0x000000, 1);
-        o.endFill();
-        c.addChild(t);
-        if(!isBegin) c.x = this._width - t.width;
-      },
-
-
-      /**
-       * Shift the background containers to the elft or the right.
-       *
-       * @param {!required} direction {String} 'left' or 'right'.
-       *
-       * @method _shiftBackgroundContainers
-       */
-      _shiftBackgroundContainers: function(direction){
-        var del_index, new_index, ref_index, offset, b, e;
-        if(direction === 'left'){
-          del_index = 0;
-          new_index = this._obselsContainers.length - 1;
-          offset = -(this._obselWidth + 2);
-          b = this._obselsContainers[this._obselsContainers.length - 1].e + 1;
-          e = b + this.get('_obselsContainersDuration');
-        }
-        else{
-          del_index = this._obselsContainer.children.length - 1;
-          new_index = 0;
-          offset = this._obselWidth + 2;
-          e = this._obselsContainers[0].b - 1;
-          b = e - this.get('_obselsContainersDuration');
-        }
-        this._backgroundContainer.removeChildAt(del_index);
-        this._backgroundContainers.splice(del_index,1);
-        for(var i = 0; i < this._backgroundContainers.length; i++){
-          this._backgroundContainers[i].c.x += offset;
-          this._backgroundContainers[i]._intervalIndex = i;
-        }
-        var container = this._createContainer(new_index);
-        this.splice('_backgroundContainers',new_index,0, {
-          "c": container, "b": b, "e": e
-        });
-        this._backgroundContainer.addChildAt(this._backgroundContainers[new_index].c, new_index);
-        this._fillBackgroundContainer(new_index);
-      },
-
-      /**
-       * Fill a background container with the right color.
-       *
-       * @param {!required} index {Number} Index of the background container.
-       *
-       * @method _fillBackgroundContainer
-       */
-      _fillBackgroundContainer(index){
-        var c = this._backgroundContainers[index];
-        var oc = null;
-        if(index === 0){
-          var indexs = this._backgroundContainers[1].c.children.length - 1;
-          if(indexs > -1){
-            oc = this._backgroundContainers[1].c.getChildAt(indexs).originalColor;
-            if(this._backgroundContainers[1]._isRefFromBegin) oc =  (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
-          }
-          else oc = 0xECEFF1;
-        }
-        else{
-          oc = this._backgroundContainers[index - 1].c.getChildAt(0).originalColor;
-          if(this._backgroundContainers[index - 1]._isRefFromEnd) oc =  (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
-        }
-
-        var d = this._ttu.get_date_according_to_period( this.get('_fittestPeriod'), new Date(c.e));
-        if(d.valueOf() > c.b){
-          this._ttu.get_date_according_to_period(this.get('_fittestPeriod'), new Date(c.e));
-          var h = ((c.e-d.valueOf())*this._height)/(c.e-c.b);
-          var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
-          var o1 = new PIXI.Graphics();
-          if(index === 0) {
-            o1.beginFill(oc);
-            o1.originalColor = oc;
-          }
-          else{
-             o1.beginFill(pcolor);
-             o1.originalColor = pcolor;
-          }
-          o1.drawRect(0, 0, this._obselWidth + 2, h);
-          o1.endFill();
-          o1.y = 0;
-          o1.x = 0;
-          this._backgroundContainers[index].c.addChild(o1);
-          var o2 = new PIXI.Graphics();
-          if(index !== 0) {
-            o2.beginFill(oc);
-            o2.originalColor = oc;
-          }
-          else{
-             o2.beginFill(pcolor);
-             o2.originalColor = pcolor;
-          }
-          o2.drawRect(0, 0, this._obselWidth + 2, this._height-h);
-          o2.endFill();
-          o2.y = h;
-          o2.x = 0;
-          this._backgroundContainers[index].c.addChild(o2);
-          this._backgroundContainers[index]._isRefInMiddle = true;
-        }
-        else{
-          var o = new PIXI.Graphics();
-          if(d.valueOf() === this._backgroundContainers[index].b){
-            this._backgroundContainers[index]._isRefFromBegin = true;
-            if(index !== 0){
-              var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
-              o.beginFill(pcolor);
-            }
-            else{
-              o.beginFill(oc);
-            }
-          }
-          else if(d.valueOf() === this._backgroundContainers[index].e) {
-            this._backgroundContainers[index]._isRefFromBegin = false;
-            this._backgroundContainers[index]._isRefFromEnd = true;
-            if(index === 0){
-              var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
-              o.beginFill(pcolor);
-            }
-            else{
-              o.beginFill(oc);
-            }
-          }
-          else{
-            this._backgroundContainers[index]._isRefFromBegin = false;
-            this._backgroundContainers[index]._isRefFromEnd = false;
-            o.beginFill(oc);
-          }
-          o.drawRect(0, 0, this._obselWidth + 2, this._height);
-          o.endFill();
-          o.y = 0;
-          o.x = 0;
-          o.originalColor = oc;
-          this._backgroundContainers[index].c.addChild(o);
-          this._backgroundContainers[index]._isRefInMiddle = false;
-        }
-      },
-
-      /**
-       * Create an obsel container at a given index (position).
-       *
-       * @method _createContainer
-       */
-      _createContainer: function(index) {
-        var container = new PIXI.Container();
-        container.x = (this._obselWidth + 2) * index;
-        container.y = 0;
-        container.width = (this._obselWidth + 2);
-        container.height = 215;
-        container._intervalIndex = index;
-        return container;
       },
 
       /**
@@ -751,35 +789,114 @@ Do not forget to bind their begin and end time.
       },
 
       /**
-       * Fill the background containers with one of the two colors.
-       * A background container aims to represents to which time interval a pile of obsel belongs.
+       * Add an outline at an obsel graphic.
        *
-       * @method _fillBackgroundContainers
+       * @param {!required} o (PIXI.Graphics) An obsel graphic representation.
+       *
+       * @method _highlightObsel
        */
-      _fillBackgroundContainers: function(){
-        for(var i = 0; i < this._backgroundContainers.length; i++){
-          this._fillBackgroundContainer(i);
+      _highlightObsel: function(o) {
+        o.clear();
+        o.beginFill(o.originalColor);
+        o.lineStyle(4, this._getComplementaryColor(o.originalColor), 1);
+        switch (o.shape) {
+          case 'STAR':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(2 * this._obselWidth / 3, this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(2 * this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(0, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 3, this._obselWidth / 3)
+            ]);
+            break;
+          case 'CIRCLE':
+            o.drawCircle(this._obselWidth / 2, this._obselWidth / 2, this._obselWidth / 2);
+            break;
+          case 'SQUARE':
+            o.drawRect(0, 0, this._obselWidth, this._obselWidth);
+            break;
+          case 'DIAMOND':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(0, this._obselWidth / 2),
+            ]);
+            break;
         }
+        o.endFill();
       },
 
       /**
-       * Fill a selected sub-container. Basically draw a blue rectangle in it.
+       * Reset the outline of an obsel graphic representation.
        *
-       * @param {!required} container (PIXI.Container) A selected sub-container.
+       * @param {!required} o (PIXI.Graphics) An obsel graphic representation.
        *
-       * @method _fillSelectedContainer
+       * @method _resetObsel
        */
-      _fillSelectedContainer: function(container){
-        if(container.children.length === 0){
-          var g = new PIXI.Graphics();
-          g.beginFill(0x039BE5);
-          g.drawRect(0, 0, this._obselWidth + 2, this._height);
-          g.alpha = 0.37;
-          g.endFill();
-          g.x = 0;
-          g.y = 0;
-          container.addChild(g);
+      _resetObsel: function(o) {
+        o.clear();
+        o.beginFill(o.originalColor);
+        switch (o.shape) {
+          case 'STAR':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(2 * this._obselWidth / 3, this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(2 * this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(this._obselWidth / 3, 2 * this._obselWidth / 3),
+              new PIXI.Point(0, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 3, this._obselWidth / 3)
+            ]);
+            break;
+          case 'CIRCLE':
+            o.drawCircle(this._obselWidth / 2, this._obselWidth / 2, this._obselWidth / 2);
+            break;
+          case 'SQUARE':
+            o.drawRect(0, 0, this._obselWidth, this._obselWidth);
+            break;
+          case 'DIAMOND':
+            o.drawPolygon([
+              new PIXI.Point(this._obselWidth / 2, 0),
+              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
+              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
+              new PIXI.Point(0, this._obselWidth / 2),
+            ]);
+            break;
         }
+        o.endFill();
+      },
+
+      /** ================================================================== **/
+      /**                              UTILITIES                             **/
+
+      /**
+       * Calculate the fittest period betwwen `begin` and `end`.
+       * Sets `_fittestPeriod`
+       *
+       * @method _calculateFittestPeriod
+       */
+      _calculateFittestPeriod: function(){
+        var p = this._ttu.get_fittest_period(this.begin, this.end, this.get('_maxPeriodCount'));
+        this.set('_fittestPeriod', p);
+      },
+
+      /**
+       * Calculate an obsel container duration.
+       * Sets `_obselsContainersDuration`
+       *
+       * @method _calculateObselsContainersDuration
+       */
+      _calculateObselsContainersDuration: function(){
+        var contCount = this._width / (this._obselWidth + 2);
+        var duration = this.end - this.begin;
+        var period = Math.ceil(duration / contCount);
+        this.set('_obselsContainersCount', contCount);
+        this.set('_obselsContainersDuration', period);
       },
 
       /**
@@ -920,45 +1037,161 @@ Do not forget to bind their begin and end time.
       },
 
       /**
-       * Add an outline at an obsel graphic.
+       * Set the behavior on a certain key down/up.
        *
-       * @param {!required} o (PIXI.Graphics) An obsel graphic representation.
+       * @param {!required} keyCode (Number) The key code.
        *
-       * @method _highlightObsel
+       * @method _keyboard
        */
-      _highlightObsel: function(o) {
-        o.clear();
-        o.beginFill(o.originalColor);
-        o.lineStyle(4, this._getComplementaryColor(o.originalColor), 1);
-        switch (o.shape) {
-          case 'STAR':
-            o.drawPolygon([
-              new PIXI.Point(this._obselWidth / 2, 0),
-              new PIXI.Point(2 * this._obselWidth / 3, this._obselWidth / 3),
-              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
-              new PIXI.Point(2 * this._obselWidth / 3, 2 * this._obselWidth / 3),
-              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
-              new PIXI.Point(this._obselWidth / 3, 2 * this._obselWidth / 3),
-              new PIXI.Point(0, this._obselWidth / 2),
-              new PIXI.Point(this._obselWidth / 3, this._obselWidth / 3)
-            ]);
-            break;
-          case 'CIRCLE':
-            o.drawCircle(this._obselWidth / 2, this._obselWidth / 2, this._obselWidth / 2);
-            break;
-          case 'SQUARE':
-            o.drawRect(0, 0, this._obselWidth, this._obselWidth);
-            break;
-          case 'DIAMOND':
-            o.drawPolygon([
-              new PIXI.Point(this._obselWidth / 2, 0),
-              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
-              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
-              new PIXI.Point(0, this._obselWidth / 2),
-            ]);
-            break;
+      _keyboard: function(keyCode) {
+        var key = {};
+        key.code = keyCode;
+        key.isDown = false;
+        key.isUp = true;
+        key.press = undefined;
+        key.release = undefined;
+        //The `downHandler`
+        key.downHandler = function(event) {
+          if (event.keyCode === key.code) {
+            if (key.isUp && key.press) key.press();
+            key.isDown = true;
+            key.isUp = false;
+            event.preventDefault();
+          }
+        };
+        //The `upHandler`
+        key.upHandler = function(event) {
+          if (event.keyCode === key.code) {
+            if (key.isDown && key.release) key.release();
+            key.isDown = false;
+            key.isUp = true;
+            event.preventDefault();
+          }
+        };
+        //Attach event listeners
+        window.addEventListener(
+          "keydown", key.downHandler.bind(key), false
+        );
+        window.addEventListener(
+          "keyup", key.upHandler.bind(key), false
+        );
+        return key;
+      },
+
+      /** ================================================================== **/
+      /**                          BOUNDS CONTAINER                          **/
+
+      /**
+       * Create a bound container.
+       *
+       * @param {!required} isBegin {Boolean} True if the bound correspond to the begin bound. False otherwise.
+       *
+       * @method _createBoundContainer
+       */
+      _createBoundContainer: function(isBegin){
+        var c = new PIXI.Container();
+        c.x = (isBegin) ? 4 : this._width - 4;
+        c.y = 4;
+        var o = new PIXI.Graphics();
+        o.x = o.y = 0;
+        c.addChild(o);
+        if(isBegin) this.set('_beginBoundContainer', c);
+        else        this.set('_endBoundContainer', c);
+      },
+
+      /**
+       * Display the two bounds value.
+       *
+       * @method _displayBoundsContainers
+       */
+      _displayBoundsContainers: function(){
+        var o = null;
+        // Create the bounds containers if they do not exist yet.
+        if(this._beginBoundContainer === null) this._createBoundContainer(true);
+        if(this._endBoundContainer === null) this._createBoundContainer(false);
+        // Add the bound containers to the stage.
+        this.$.pixijs.addToStage(this._beginBoundContainer);
+        this.$.pixijs.addToStage(this._endBoundContainer);
+        // Remove the text if the bounds containers already have one.
+        if(this._beginBoundContainer.children.length > 1) this._beginBoundContainer.removeChildAt(1);
+        if(this._endBoundContainer.children.length > 1)   this._endBoundContainer.removeChildAt(1);
+        // Fill the bounds containers
+        this._fillBoundContainer((new Date(this.begin)).toUTCString(), true);
+        this._fillBoundContainer((new Date(this.end)).toUTCString(), false);
+      },
+
+      /**
+       * Fill a bound container with its value.
+       *
+       * @param {!required} text {Boolean} The text to display.
+       * @param {!required} isBegin {Boolean} True if the bound correspond to the begin bound. False otherwise.
+       *
+       * @method _fillBoundContainer
+       */
+      _fillBoundContainer: function(text, isBegin){
+        // Create the PIXI.Text
+        var c, align;
+        if(isBegin){
+          align = 'left';
+          c = this._beginBoundContainer;
         }
+        else{
+          align = 'right';
+          c = this._endBoundContainer;
+        }
+        var t = new PIXI.Text(text,{
+          fontSize: 14,
+          align: align
+        });
+        // Refill the text background with the right size.
+        var  o = c.getChildAt(0);
+        o.clear();
+        o.beginFill(0xFFFFFF);
+        o.drawRect(0, 0, t.width, t.height);
+        o.lineStyle(2, 0x000000, 1);
         o.endFill();
+        c.addChild(t);
+        if(!isBegin) c.x = this._width - t.width;
+      },
+
+      /** ================================================================== **/
+      /**                       BACKGROUND CONTAINERS                        **/
+
+      /**
+       * Shift the background containers to the elft or the right.
+       *
+       * @param {!required} direction {String} 'left' or 'right'.
+       *
+       * @method _shiftBackgroundContainers
+       */
+      _shiftBackgroundContainers: function(direction){
+        var del_index, new_index, ref_index, offset, b, e;
+        if(direction === 'left'){
+          del_index = 0;
+          new_index = this._obselsContainers.length - 1;
+          offset = -(this._obselWidth + 2);
+          b = this._obselsContainers[this._obselsContainers.length - 1].e + 1;
+          e = b + this.get('_obselsContainersDuration');
+        }
+        else{
+          del_index = this._obselsContainer.children.length - 1;
+          new_index = 0;
+          offset = this._obselWidth + 2;
+          e = this._obselsContainers[0].b - 1;
+          b = e - this.get('_obselsContainersDuration');
+        }
+        this._backgroundContainer.removeChildAt(del_index);
+        this._backgroundContainers.splice(del_index,1);
+        for(var i = 0; i < this._backgroundContainers.length; i++){
+          this._backgroundContainers[i].c.x += offset;
+          this._backgroundContainers[i]._intervalIndex = i;
+        }
+        var container = this._createContainer(new_index);
+        this.splice('_backgroundContainers',new_index,0, {
+          "c": container, "b": b, "e": e
+        });
+        this._backgroundContainer.addChildAt(this._backgroundContainers[new_index].c, new_index);
+        this._fillBackgroundContainer(new_index);
       },
 
       /**
@@ -1001,171 +1234,149 @@ Do not forget to bind their begin and end time.
       },
 
       /**
-       * Init the keyboard listeners to set the behavior on arrow keys.
-       * The user will be allowed to move in the timeline using the arrow keys.
+       * Fill a background container with the right color.
        *
-       * @method _initKeyboard
+       * @param {!required} index {Number} Index of the background container.
+       *
+       * @method _fillBackgroundContainer
        */
-      _initKeyboard: function() {
-        // Set the keyboard listeners.
-        var left = this._keyboard(37),
-          up = this._keyboard(38),
-          right = this._keyboard(39),
-          down = this._keyboard(40);
-        // Up behavior
-        up.press = function() {
-          if(this.selectedObsel){
-            var oIndex = this.selectedObsel._oIndex;
-            var cIndex = this.selectedObsel._cIndex;
-            if(oIndex + 1 < this._obselsContainers[cIndex].c.children.length){
-              var no = this._obselsContainers[cIndex].c.getChildAt(oIndex + 1);
-              this._highlightObsel(no);
-              this._resetObsel(this.selectedObsel);
-              no._selected = true;
-              this.selectedObsel._selected = false;
-              this.set('selectedObsel' , no);
-              this.set('_lastObselIndex', oIndex + 1);
-              this.fire('selected-obsel');
+      _fillBackgroundContainer(index){
+        var c = this._backgroundContainers[index];
+        var oc = null;
+        if(index === 0){
+          var indexs = this._backgroundContainers[1].c.children.length - 1;
+          if(indexs > -1){
+            oc = this._backgroundContainers[1].c.getChildAt(indexs).originalColor;
+            if(this._backgroundContainers[1]._isRefFromBegin) oc =  (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+          }
+          else oc = 0xECEFF1;
+        }
+        else{
+          oc = this._backgroundContainers[index - 1].c.getChildAt(0).originalColor;
+          if(this._backgroundContainers[index - 1]._isRefFromEnd) oc =  (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+        }
+
+        var d = this._ttu.get_date_according_to_period( this.get('_fittestPeriod'), new Date(c.e));
+        if(d.valueOf() > c.b){
+          this._ttu.get_date_according_to_period(this.get('_fittestPeriod'), new Date(c.e));
+          var h = ((c.e-d.valueOf())*this._height)/(c.e-c.b);
+          var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+          var o1 = new PIXI.Graphics();
+          if(index === 0) {
+            o1.beginFill(oc);
+            o1.originalColor = oc;
+          }
+          else{
+             o1.beginFill(pcolor);
+             o1.originalColor = pcolor;
+          }
+          o1.drawRect(0, 0, this._obselWidth + 2, h);
+          o1.endFill();
+          o1.y = 0;
+          o1.x = 0;
+          this._backgroundContainers[index].c.addChild(o1);
+          var o2 = new PIXI.Graphics();
+          if(index !== 0) {
+            o2.beginFill(oc);
+            o2.originalColor = oc;
+          }
+          else{
+             o2.beginFill(pcolor);
+             o2.originalColor = pcolor;
+          }
+          o2.drawRect(0, 0, this._obselWidth + 2, this._height-h);
+          o2.endFill();
+          o2.y = h;
+          o2.x = 0;
+          this._backgroundContainers[index].c.addChild(o2);
+          this._backgroundContainers[index]._isRefInMiddle = true;
+        }
+        else{
+          var o = new PIXI.Graphics();
+          if(d.valueOf() === this._backgroundContainers[index].b){
+            this._backgroundContainers[index]._isRefFromBegin = true;
+            if(index !== 0){
+              var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+              o.beginFill(pcolor);
             }
             else{
-              cIndex++;
-              while(cIndex < this._obselsContainers.length && this._obselsContainers[cIndex].c.children.length === 0){
-                cIndex++;
-              }
-              if(cIndex < this._obselsContainers.length){
-                var no = this._obselsContainers[cIndex].c.getChildAt(0);
-                this._highlightObsel(no);
-                this._resetObsel(this.selectedObsel);
-                no._selected = true;
-                this.selectedObsel._selected = false;
-                this.set('selectedObsel' , no);
-                this.set('_lastObselIndex', 0);
-                this.fire('selected-obsel');
-              }
+              o.beginFill(oc);
             }
           }
-        }.bind(this);
-
-        down.press = function() {
-          if(this.selectedObsel){
-            var oIndex = this.selectedObsel._oIndex;
-            var cIndex = this.selectedObsel._cIndex;
-            if(oIndex - 1 >= 0){
-              var no = this._obselsContainers[cIndex].c.getChildAt(oIndex - 1);
-              this._highlightObsel(no);
-              this._resetObsel(this.selectedObsel);
-              no._selected = true;
-              this.selectedObsel._selected = false;
-              this.set('selectedObsel', no);
-              this.set('_lastObselIndex', oIndex - 1);
-              this.fire('selected-obsel');
+          else if(d.valueOf() === this._backgroundContainers[index].e) {
+            this._backgroundContainers[index]._isRefFromBegin = false;
+            this._backgroundContainers[index]._isRefFromEnd = true;
+            if(index === 0){
+              var pcolor = (oc === 0xECEFF1) ? 0xFAFAFA : 0xECEFF1;
+              o.beginFill(pcolor);
             }
             else{
-              cIndex--;
-              while(cIndex >= 0 && this._obselsContainers[cIndex].c.children.length === 0){
-                cIndex--;
-              }
-              if(cIndex >= 0){
-                var no = this._obselsContainers[cIndex].c.getChildAt(this._obselsContainers[cIndex].c.children.length - 1);
-                this._highlightObsel(no);
-                this._resetObsel(this.selectedObsel);
-                no._selected = true;
-                this.selectedObsel._selected = false;
-                this.set('selectedObsel', no);
-                this.set('_lastObselIndex', this._obselsContainers[cIndex].c.children.length - 1);
-                this.fire('selected-obsel');
-              }
+              o.beginFill(oc);
             }
           }
-        }.bind(this);
-
-        right.press = function() {
-          if(this.selectedObsel){
-            var oIndex = this.selectedObsel._oIndex;
-            var cIndex = this.selectedObsel._cIndex;
-            cIndex++;
-            while(cIndex < this._obselsContainers.length && this._obselsContainers[cIndex].c.children.length === 0){
-              cIndex++;
-            }
-            if(cIndex < this._obselsContainers.length){
-              var no;
-              if( this._lastObselIndex < this._obselsContainers[cIndex].c.children.length){
-                no = this._obselsContainers[cIndex].c.getChildAt(this._lastObselIndex);
-              }
-              else{
-                no = this._obselsContainers[cIndex].c.getChildAt(this._obselsContainers[cIndex].c.children.length - 1);
-              }
-              this._highlightObsel(no);
-              this._resetObsel(this.selectedObsel);
-              no._selected = true;
-              this.selectedObsel._selected = false;
-              this.set('selectedObsel', no);
-              this.fire('selected-obsel');
-            }
+          else{
+            this._backgroundContainers[index]._isRefFromBegin = false;
+            this._backgroundContainers[index]._isRefFromEnd = false;
+            o.beginFill(oc);
           }
-        }.bind(this);
-
-        left.press = function() {
-          if(this.selectedObsel){
-            var oIndex = this.selectedObsel._oIndex;
-            var cIndex = this.selectedObsel._cIndex;
-            cIndex--;
-            while(cIndex >= 0 && this._obselsContainers[cIndex].c.children.length === 0){
-              cIndex--;
-            }
-            if(cIndex >= 0){
-              var no;
-              if( this._lastObselIndex < this._obselsContainers[cIndex].c.children.length){
-                no = this._obselsContainers[cIndex].c.getChildAt(this._lastObselIndex);
-              }
-              else{
-                no = this._obselsContainers[cIndex].c.getChildAt(this._obselsContainers[cIndex].c.children.length - 1);
-              }
-              this._highlightObsel(no);
-              this._resetObsel(this.selectedObsel);
-              no._selected = true;
-              this.selectedObsel._selected = false;
-              this.set('selectedObsel', no);
-              this.fire('selected-obsel');
-            }
-          }
-        }.bind(this);
+          o.drawRect(0, 0, this._obselWidth + 2, this._height);
+          o.endFill();
+          o.y = 0;
+          o.x = 0;
+          o.originalColor = oc;
+          this._backgroundContainers[index].c.addChild(o);
+          this._backgroundContainers[index]._isRefInMiddle = false;
+        }
       },
 
       /**
-       * Init the obsels containers. An obsel container is a pile of obsel of a given interval.
+       * Create an obsel container at a given index (position).
        *
-       * @method _initObselsContainer
+       * @method _createContainer
        */
-      _initObselsContainer: function() {
-        // TODO clean before.
-        if(this._obselsContainer){
-          this.$.pixijs.removeChildFromStage(this._obselsContainer);
+      _createContainer: function(index) {
+        var container = new PIXI.Container();
+        container.x = (this._obselWidth + 2) * index;
+        container.y = 0;
+        container.width = (this._obselWidth + 2);
+        container.height = 215;
+        container._intervalIndex = index;
+        return container;
+      },
+
+      /**
+       * Fill the background containers with one of the two colors.
+       * A background container aims to represents to which time interval a pile of obsel belongs.
+       *
+       * @method _fillBackgroundContainers
+       */
+      _fillBackgroundContainers: function(){
+        for(var i = 0; i < this._backgroundContainers.length; i++){
+          this._fillBackgroundContainer(i);
         }
-        // Create the obsels main container.
-        this.set('_obselsContainer', new PIXI.Container());
-        this._obselsContainer.x = 0;
-        this._obselsContainer.y = 0;
-        this._obselsContainer.width = this._width;
-        this._obselsContainer.height = this._height;
-        // Calculate the intervals and create the sub-containers.
-        var contCount = this._width / (this._obselWidth + 2);
-        var duration = this.end - this.begin;
-        var period = Math.ceil(duration / contCount);
-        this.set('_obselsContainers', []);
-        for (var i = 0; i < contCount; i++) {
-          var b = this.begin + (period * i);
-          var e = b + period
-          var container = this._createContainer(i);
-          this.push('_obselsContainers', {
-            "c": container,
-            "b": b,
-            "e": e,
-            "of": 0
-          });
-          this._obselsContainer.addChild(container);
+      },
+
+      /** ================================================================== **/
+      /**                       SELECTED   CONTAINERS                        **/
+
+      /**
+       * Fill a selected sub-container. Basically draw a blue rectangle in it.
+       *
+       * @param {!required} container (PIXI.Container) A selected sub-container.
+       *
+       * @method _fillSelectedContainer
+       */
+      _fillSelectedContainer: function(container){
+        if(container.children.length === 0){
+          var g = new PIXI.Graphics();
+          g.beginFill(0x039BE5);
+          g.drawRect(0, 0, this._obselWidth + 2, this._height);
+          g.alpha = 0.37;
+          g.endFill();
+          g.x = 0;
+          g.y = 0;
+          container.addChild(g);
         }
-        this.$.pixijs.addToStage(this._obselsContainer);
       },
 
       /**
@@ -1221,161 +1432,6 @@ Do not forget to bind their begin and end time.
           'b': b,
           'e': e
         })
-      },
-
-      /**
-       * Set the behavior on a certain key down/up.
-       *
-       * @param {!required} keyCode (Number) The key code.
-       *
-       * @method _keyboard
-       */
-      _keyboard: function(keyCode) {
-        var key = {};
-        key.code = keyCode;
-        key.isDown = false;
-        key.isUp = true;
-        key.press = undefined;
-        key.release = undefined;
-        //The `downHandler`
-        key.downHandler = function(event) {
-          if (event.keyCode === key.code) {
-            if (key.isUp && key.press) key.press();
-            key.isDown = true;
-            key.isUp = false;
-            event.preventDefault();
-          }
-        };
-        //The `upHandler`
-        key.upHandler = function(event) {
-          if (event.keyCode === key.code) {
-            if (key.isDown && key.release) key.release();
-            key.isDown = false;
-            key.isUp = true;
-            event.preventDefault();
-          }
-        };
-        //Attach event listeners
-        window.addEventListener(
-          "keydown", key.downHandler.bind(key), false
-        );
-        window.addEventListener(
-          "keyup", key.upHandler.bind(key), false
-        );
-        return key;
-      },
-
-      /**
-       * Display, if necessary, the obsel obsels overflow on the container.
-       *
-       * @param {!required} container (PIXI.Container) The obsel container.
-       * @param {!required} overflow  (Number) The obsels overflow.
-       *
-       * @method _manageObselContainerOverflow
-       */
-      _manageObselContainerOverflow: function(container, overflow) {
-        if(overflow > 0){
-          overflow += container.of;
-          // TODO Use a var !
-          if(container.c.children.length === this._maxObselsInPile){
-            container.c.removeChildAt(container.c.children.length - 1);
-            overflow += 1;
-          }
-          // Add the text
-          container.of = overflow;
-          var t = new PIXI.Text("+"+overflow,{
-            fontFamily: "Arial",
-            fontSize: this._obselWidth,
-            fill: 0x000000,
-            align: "right"
-          });
-          t.anchor.set(0.5);
-          t.setTransform(null,null,null,null,-1.5708);
-          t.y = ( t.width / 2 ) + 2;
-          t.x = ( t.height / 2 ) + 1;
-          // Remove the two last obsels and add the counter
-          container.c.addChild(t);
-        }
-        else{
-          container.of = 0;
-        }
-      },
-
-      /**
-       * Change `_width` according to the pixi width.
-       *
-       * @method _onPixiJsResize
-       */
-      _onPixiJsResize: function() {
-        this.async(function(evt) {
-          this.set('_width', this.$.pixijs.clientWidth);
-          this.updateVisu();
-        }.bind(this), 500);
-      },
-
-      /**
-       * Remove the pixijs element, and call the resizing process inside a timeout stored in `_resizeTimeout`.
-       * Clear the existing `_resizeTimeout` if there's already one.
-       *
-       * @method _onResize
-       */
-      _onResize: function(){
-        // Hide the pixijs component to retrieve the real offset bounds.
-        this.$.pixijs.style.display = 'none';
-        // Clear the previous resizing timeout. If it's null, won't trigger any error \o/.
-        clearTimeout(this.get('_resizeTimeout'));
-        // Set the new timeout.
-        // First call `resizeVisu`. Then retrieve the stored obsels. Clean the `_obselsList` property.
-        // Finally redraw the obsels and show the timeline back.
-        this.set('_resizeTimeout', setTimeout(function(){
-          this.resizeVisu();
-          this.setTemporalBounds(this.begin, this.end);
-          var l = this.get('_obselsList');
-          this.set('_obselsList', []);
-          this.redrawObsels(l);
-          this.$.pixijs.style.display = 'block';
-        }.bind(this), 200));
-      },
-
-      /**
-       * Reset the outline of an obsel graphic representation.
-       *
-       * @param {!required} o (PIXI.Graphics) An obsel graphic representation.
-       *
-       * @method _resetObsel
-       */
-      _resetObsel: function(o) {
-        o.clear();
-        o.beginFill(o.originalColor);
-        switch (o.shape) {
-          case 'STAR':
-            o.drawPolygon([
-              new PIXI.Point(this._obselWidth / 2, 0),
-              new PIXI.Point(2 * this._obselWidth / 3, this._obselWidth / 3),
-              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
-              new PIXI.Point(2 * this._obselWidth / 3, 2 * this._obselWidth / 3),
-              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
-              new PIXI.Point(this._obselWidth / 3, 2 * this._obselWidth / 3),
-              new PIXI.Point(0, this._obselWidth / 2),
-              new PIXI.Point(this._obselWidth / 3, this._obselWidth / 3)
-            ]);
-            break;
-          case 'CIRCLE':
-            o.drawCircle(this._obselWidth / 2, this._obselWidth / 2, this._obselWidth / 2);
-            break;
-          case 'SQUARE':
-            o.drawRect(0, 0, this._obselWidth, this._obselWidth);
-            break;
-          case 'DIAMOND':
-            o.drawPolygon([
-              new PIXI.Point(this._obselWidth / 2, 0),
-              new PIXI.Point(this._obselWidth, this._obselWidth / 2),
-              new PIXI.Point(this._obselWidth / 2, this._obselWidth),
-              new PIXI.Point(0, this._obselWidth / 2),
-            ]);
-            break;
-        }
-        o.endFill();
       },
 
       /**
@@ -1499,6 +1555,45 @@ Do not forget to bind their begin and end time.
         }.bind(container, this));
         return container;
       },
+
+      /** ================================================================== **/
+      /**                       OBSELS     CONTAINERS                        **/
+
+      /**
+       * Init the obsels containers. An obsel container is a pile of obsel of a given interval.
+       *
+       * @method _initObselsContainer
+       */
+      _initObselsContainer: function() {
+        // TODO clean before.
+        if(this._obselsContainer){
+          this.$.pixijs.removeChildFromStage(this._obselsContainer);
+        }
+        // Create the obsels main container.
+        this.set('_obselsContainer', new PIXI.Container());
+        this._obselsContainer.x = 0;
+        this._obselsContainer.y = 0;
+        this._obselsContainer.width = this._width;
+        this._obselsContainer.height = this._height;
+        // Calculate the intervals and create the sub-containers.
+        var contCount = this._width / (this._obselWidth + 2);
+        var duration = this.end - this.begin;
+        var period = Math.ceil(duration / contCount);
+        this.set('_obselsContainers', []);
+        for (var i = 0; i < contCount; i++) {
+          var b = this.begin + (period * i);
+          var e = b + period
+          var container = this._createContainer(i);
+          this.push('_obselsContainers', {
+            "c": container,
+            "b": b,
+            "e": e,
+            "of": 0
+          });
+          this._obselsContainer.addChild(container);
+        }
+        this.$.pixijs.addToStage(this._obselsContainer);
+      }
 
     });
   </script>
