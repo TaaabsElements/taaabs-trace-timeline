@@ -617,7 +617,7 @@ Do not forget to bind their begin and end time.
         // For each obsel pile, check if its not full, then draw the obsel.
         for (cIndex = 0; cIndex < this._obselsContainers.length; cIndex++) {
           overflow = 0;
-          while (oIndex < list.length && this._obselsContainers[cIndex].b <= list[oIndex].obsel.begin && this._obselsContainers[cIndex].e > list[oIndex].obsel.end) {
+          while (oIndex < list.length && this._obselsContainers[cIndex].b <= list[oIndex].obsel.end && this._obselsContainers[cIndex].e > list[oIndex].obsel.end) {
             if(list[oIndex].visible){
               if (this._obselsContainers[cIndex].c.children.length < this._maxObselsInPile){
                 this._obselsContainers[cIndex].c.addChild(this._createObsel(cIndex, list[oIndex]));
